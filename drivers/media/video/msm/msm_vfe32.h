@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #ifndef __MSM_VFE32_H__
 #define __MSM_VFE32_H__
@@ -1019,6 +1023,13 @@ struct vfe_cmd_stats_ack {
 
 struct vfe_cmd_stats_buf {
 	uint32_t statsBuf[VFE_STATS_BUFFER_COUNT];
+};
+
+struct vfe_frame_skip_flag {
+	uint8_t frame_skip_irq0;
+	uint8_t frame_skip_irq1;
+	uint8_t frame_skip_rdi0;
+	uint8_t frame_skip_rdi1;
 };
 
 #define VIDIOC_MSM_AXI_INIT \

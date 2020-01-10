@@ -9,13 +9,20 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include "msm_camera_i2c.h"
+
+#define MSM_CAMERA_I2C_RETRY_COUNT	5
 
 int32_t msm_camera_i2c_rxdata(struct msm_camera_i2c_client *dev_client,
 	unsigned char *rxdata, int data_length)
 {
 	int32_t rc = 0;
+	int32_t i;
 	uint16_t saddr = dev_client->client->addr >> 1;
 	struct i2c_msg msgs[] = {
 		{
@@ -31,7 +38,14 @@ int32_t msm_camera_i2c_rxdata(struct msm_camera_i2c_client *dev_client,
 			.buf   = rxdata,
 		},
 	};
-	rc = i2c_transfer(dev_client->client->adapter, msgs, 2);
+	for (i = 0; i < MSM_CAMERA_I2C_RETRY_COUNT; i++) {
+		rc = i2c_transfer(dev_client->client->adapter, msgs, 2);
+
+		if (rc >= 0) {
+			break;
+		}
+		pr_err("%s: retry: %d\n", __func__, (i+1));
+	}
 	if (rc < 0)
 		S_I2C_DBG("msm_camera_i2c_rxdata failed 0x%x\n", saddr);
 	return rc;
@@ -41,6 +55,7 @@ int32_t msm_camera_i2c_txdata(struct msm_camera_i2c_client *dev_client,
 				unsigned char *txdata, int length)
 {
 	int32_t rc = 0;
+	int32_t i;
 	uint16_t saddr = dev_client->client->addr >> 1;
 	struct i2c_msg msg[] = {
 		{
@@ -50,10 +65,27 @@ int32_t msm_camera_i2c_txdata(struct msm_camera_i2c_client *dev_client,
 			.buf = txdata,
 		 },
 	};
-	rc = i2c_transfer(dev_client->client->adapter, msg, 1);
+	for (i = 0; i < MSM_CAMERA_I2C_RETRY_COUNT; i++) {
+		rc = i2c_transfer(dev_client->client->adapter, msg, 1);
+		if (rc >= 0) {
+			break;
+		}
+		pr_err("%s: retry: %d\n", __func__, (i+1));
+	}
 	if (rc < 0)
 		S_I2C_DBG("msm_camera_i2c_txdata faild 0x%x\n", saddr);
-	return 0;
+	return rc;
+}
+
+int32_t msm_camera_i2c_burst_write(struct msm_camera_i2c_client *client,
+	uint16_t *buf, uint16_t size)
+{
+	int32_t rc = -EFAULT;
+    /* buf[0] == ADDR  buf[1-n] == WORD_DATA */
+    rc= msm_camera_i2c_write_burst_seq(client,buf[0],&buf[1],(size-1));
+	if (rc < 0)
+		S_I2C_DBG("%s fail\n", __func__);
+	return rc;
 }
 
 int32_t msm_camera_i2c_write(struct msm_camera_i2c_client *client,
@@ -96,6 +128,46 @@ int32_t msm_camera_i2c_write(struct msm_camera_i2c_client *client,
 	}
 
 	rc = msm_camera_i2c_txdata(client, buf, len);
+	if (rc < 0)
+		S_I2C_DBG("%s fail\n", __func__);
+	return rc;
+}
+
+int32_t msm_camera_i2c_write_burst_seq(struct msm_camera_i2c_client *client,
+	uint16_t addr, uint16_t *data, uint16_t num_byte)
+{
+	int32_t rc = -EFAULT;
+	unsigned char buf[client->addr_type+(num_byte*2)];
+	uint32_t len = 0, i = 0;
+	uint32_t cnt = 0;
+	if ((client->addr_type != MSM_CAMERA_I2C_BYTE_ADDR
+		&& client->addr_type != MSM_CAMERA_I2C_WORD_ADDR)
+		|| num_byte == 0)
+		return rc;
+
+	S_I2C_DBG("%s reg addr = 0x%x num bytes: %d\n",
+			  __func__, addr, num_byte);
+	if (client->addr_type == MSM_CAMERA_I2C_BYTE_ADDR) {
+		buf[0] = addr;
+		S_I2C_DBG("%s byte %d: 0x%x\n", __func__, len, buf[len]);
+		len = 1;
+	} else if (client->addr_type == MSM_CAMERA_I2C_WORD_ADDR) {
+		buf[0] = addr >> BITS_PER_BYTE;
+		buf[1] = addr;
+		S_I2C_DBG("%s byte %d: 0x%x\n", __func__, len, buf[len]);
+		S_I2C_DBG("%s byte %d: 0x%x\n", __func__, len+1, buf[len+1]);
+		len = 2;
+	}
+	cnt=len;
+	for (i = 0; i < num_byte; i++) {
+		buf[cnt] = data[i] >> BITS_PER_BYTE;
+		S_I2C_DBG("Byte %d: 0x%2x\n", cnt, buf[cnt]);
+		cnt++;
+		buf[cnt] = data[i];
+		S_I2C_DBG("Byte %d: 0x%2x\n", cnt, buf[cnt]);
+		cnt++;
+	}
+	rc = msm_camera_i2c_txdata(client, buf, len+(num_byte*2));
 	if (rc < 0)
 		S_I2C_DBG("%s fail\n", __func__);
 	return rc;
@@ -407,9 +479,15 @@ int32_t msm_sensor_write_conf_array(struct msm_camera_i2c_client *client,
 {
 	int32_t rc;
 
-	rc = msm_camera_i2c_write_tbl(client,
-		(struct msm_camera_i2c_reg_conf *) array[index].conf,
-		array[index].size, array[index].data_type);
+	if (array[index].data_type == MSM_CAMERA_I2C_BURST_DATA){
+		rc = msm_camera_i2c_burst_write(client,
+			(uint16_t *) array[index].conf,
+			array[index].size);
+	} else {
+		rc = msm_camera_i2c_write_tbl(client,
+			(struct msm_camera_i2c_reg_conf *) array[index].conf,
+			array[index].size, array[index].data_type);
+	}
 	if (array[index].delay > 20)
 		msleep(array[index].delay);
 	else

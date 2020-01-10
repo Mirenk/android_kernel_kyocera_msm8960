@@ -10,6 +10,12 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * (C) 2013 KYOCERA Corporation
+ */
+
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
@@ -36,7 +42,9 @@
 #include <linux/platform_data/qcom_wcnss_device.h>
 #include <linux/leds.h>
 #include <linux/leds-pm8xxx.h>
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT
 #include <linux/i2c/atmel_mxt_ts.h>
+#endif
 #include <linux/msm_tsens.h>
 #include <linux/ks8851.h>
 #include <linux/i2c/isa1200.h>
@@ -51,7 +59,9 @@
 #include <asm/mach/mmc.h>
 
 #include <mach/board.h>
+#ifdef CONFIG_TSPP
 #include <mach/msm_tspp.h>
+#endif
 #include <mach/msm_iomap.h>
 #include <mach/msm_spi.h>
 #include <mach/msm_serial_hs.h>
@@ -89,6 +99,15 @@
 
 #include <linux/fmem.h>
 
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_KC
+#include "board-8960-touch.h"
+#endif
+
+#ifdef CONFIG_DTVTUNER_PM
+#include <linux/dtvtuner_pm.h>
+#define D_DTVTUNER_DEVICE_PORT_RESET    53
+#endif
+
 #include "timer.h"
 #include "devices.h"
 #include "devices-msm8x60.h"
@@ -101,6 +120,13 @@
 #include "smd_private.h"
 #include "pm-boot.h"
 #include "msm_watchdog.h"
+#include <mach/kc_board.h>
+
+#include <mach/hs_io_ctl_a.h>
+
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+#include <linux/persistent_ram.h>
+#endif
 
 static struct platform_device msm_fm_platform_init = {
 	.name = "iris_fm",
@@ -109,7 +135,15 @@ static struct platform_device msm_fm_platform_init = {
 
 #define KS8851_RST_GPIO		89
 #define KS8851_IRQ_GPIO		90
-#define HAP_SHIFT_LVL_OE_GPIO	47
+#define HAP_SHIFT_LVL_OE_GPIO	78 /* 47 to 78 for led debug */
+
+#define GSBI_PROTOCOL_CODE_IDLE               0x00
+#define GSBI_PROTOCOL_CODE_I2C_AND_SIM_RUIM   0x10
+#define GSBI_PROTOCOL_CODE_I2C                0x20
+#define GSBI_PROTOCOL_CODE_SPI                0x30
+#define GSBI_PROTOCOL_CODE_UART_OR_IRDA       0x40
+#define GSBI_PROTOCOL_CODE_SIM_RUIM           0x50
+#define GSBI_PROTOCOL_CODE_I2C_AND_UART       0x60
 
 #define MHL_GPIO_INT            4
 #define MHL_GPIO_RESET          15
@@ -838,9 +872,26 @@ static int msm8960_change_memory_power(u64 start, u64 size,
 	return soc_change_memory_power(start, size, change_type);
 }
 
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+struct persistent_ram_descriptor ram_console_desc = {
+	.name = "ram_console",
+	.size = CONFIG_ANDROID_RAM_CONSOLE_SIZE,
+};
+
+struct persistent_ram ram_console_ram = {
+	.start = CONFIG_ANDROID_RAM_CONSOLE_ADDR,
+	.size  = CONFIG_ANDROID_RAM_CONSOLE_SIZE,
+	.num_descs = 1,
+	.descs = &ram_console_desc,
+};
+#endif
+
 static void __init msm8960_allocate_memory_regions(void)
 {
 	msm8960_allocate_fb_region();
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+    persistent_ram_early_init(&ram_console_ram);
+#endif
 }
 
 #ifdef CONFIG_WCD9310_CODEC
@@ -864,12 +915,12 @@ static struct wcd9xxx_pdata tabla_platform_data = {
 	.irq = MSM_GPIO_TO_INT(62),
 	.irq_base = TABLA_INTERRUPT_BASE,
 	.num_irqs = NR_WCD9XXX_IRQS,
-	.reset_gpio = PM8921_GPIO_PM_TO_SYS(34),
+	.reset_gpio = PM8921_GPIO_PM_TO_SYS(36),
 	.micbias = {
 		.ldoh_v = TABLA_LDOH_2P85_V,
 		.cfilt1_mv = 1800,
 		.cfilt2_mv = 2700,
-		.cfilt3_mv = 1800,
+		.cfilt3_mv = 2000,
 		.bias1_cfilt_sel = TABLA_CFILT1_SEL,
 		.bias2_cfilt_sel = TABLA_CFILT2_SEL,
 		.bias3_cfilt_sel = TABLA_CFILT3_SEL,
@@ -931,12 +982,16 @@ static struct wcd9xxx_pdata tabla20_platform_data = {
 	.irq = MSM_GPIO_TO_INT(62),
 	.irq_base = TABLA_INTERRUPT_BASE,
 	.num_irqs = NR_WCD9XXX_IRQS,
-	.reset_gpio = PM8921_GPIO_PM_TO_SYS(34),
+	.reset_gpio = PM8921_GPIO_PM_TO_SYS(36),
+	.amic_settings = {
+		.legacy_mode = 0x06,
+		.use_pdata   = 0x06,
+	},
 	.micbias = {
 		.ldoh_v = TABLA_LDOH_2P85_V,
 		.cfilt1_mv = 1800,
 		.cfilt2_mv = 2700,
-		.cfilt3_mv = 1800,
+		.cfilt3_mv = 2000,
 		.bias1_cfilt_sel = TABLA_CFILT1_SEL,
 		.bias2_cfilt_sel = TABLA_CFILT2_SEL,
 		.bias3_cfilt_sel = TABLA_CFILT3_SEL,
@@ -1295,6 +1350,7 @@ static struct mdm_platform_data sglte_platform_data = {
 	.no_powerdown_after_ramdumps = 1,
 };
 
+#ifdef CONFIG_TSPP
 #define MSM_TSIF0_PHYS			(0x18200000)
 #define MSM_TSIF1_PHYS			(0x18201000)
 #define MSM_TSIF_SIZE			(0x200)
@@ -1375,6 +1431,7 @@ static struct platform_device msm_device_tspp = {
 		.platform_data = &tspp_platform_data
 	},
 };
+#endif
 
 #define MSM_SHARED_RAM_PHYS 0x80000000
 
@@ -1701,6 +1758,7 @@ static struct msm_spm_platform_data msm_spm_l2_data[] __initdata = {
 #define PM_HAP_EN_GPIO		PM8921_GPIO_PM_TO_SYS(33)
 #define PM_HAP_LEN_GPIO		PM8921_GPIO_PM_TO_SYS(20)
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 static struct msm_xo_voter *xo_handle_d1;
 
 static int isa1200_power(int on)
@@ -1823,6 +1881,7 @@ static struct i2c_board_info msm_isa1200_board_info[] __initdata = {
 	},
 };
 
+#ifdef CONFIG_TOUCHSCREEN_CYTTSP_I2C
 #define CYTTSP_TS_GPIO_IRQ		11
 #define CYTTSP_TS_SLEEP_GPIO		50
 #define CYTTSP_TS_RESOUT_N_GPIO		52
@@ -1934,7 +1993,9 @@ static struct cyttsp_platform_data cyttsp_pdata = {
 	.init = cyttsp_platform_init,
 	.correct_fw_ver = 9,
 };
+#endif
 
+#ifdef CONFIG_TOUCHSCREEN_CYTTSP_I2C
 static struct i2c_board_info cyttsp_info[] __initdata = {
 	{
 		I2C_BOARD_INFO(CY_I2C_NAME, 0x24),
@@ -1944,7 +2005,9 @@ static struct i2c_board_info cyttsp_info[] __initdata = {
 #endif /* CY_USE_TIMER */
 	},
 };
+#endif
 
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT
 /* configuration data for mxt1386 */
 static const u8 mxt1386_config_data[] = {
 	/* T6 Object */
@@ -2160,7 +2223,11 @@ static const u8 mxt1386e_config_data_3d[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0,
 };
+#endif
+#endif
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT
 #define MXT_TS_GPIO_IRQ			11
 #define MXT_TS_LDO_EN_GPIO		50
 #define MXT_TS_RESET_GPIO		52
@@ -2188,7 +2255,11 @@ static void mxt_init_hw_liquid(void)
 err_ldo_gpio_req:
 	gpio_free(MXT_TS_LDO_EN_GPIO);
 }
+#endif
+#endif
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT
 static struct mxt_config_info mxt_config_array_2d[] = {
 	{
 		.config		= mxt1386_config_data,
@@ -2282,6 +2353,7 @@ static struct i2c_board_info mxt_device_info[] __initdata = {
 		.irq = MSM_GPIO_TO_INT(MXT_TS_GPIO_IRQ),
 	},
 };
+#endif
 
 static struct msm_mhl_platform_data mhl_platform_data = {
 	.irq = MSM_GPIO_TO_INT(4),
@@ -2308,7 +2380,16 @@ static struct i2c_board_info sii_device_info[] __initdata = {
 		.flags = I2C_CLIENT_WAKE,
 	},
 };
+#endif
 
+static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi2_pdata = {
+	.clk_freq = 350000,
+	.src_clk_rate = 24000000,
+	.gsbi_protocol_code = GSBI_PROTOCOL_CODE_I2C,
+	.msm_i2c_init_device = i2c_reset_S7780A,
+};
+
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi4_pdata = {
 	.clk_freq = 100000,
 	.src_clk_rate = 24000000,
@@ -2318,15 +2399,33 @@ static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi3_pdata = {
 	.clk_freq = 100000,
 	.src_clk_rate = 24000000,
 };
+#endif
 
+static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi3_pdata = {
+	.clk_freq = 350000,
+	.src_clk_rate = 24000000,
+	.gsbi_protocol_code = GSBI_PROTOCOL_CODE_I2C,
+};
+
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi10_pdata = {
 	.clk_freq = 100000,
 	.src_clk_rate = 24000000,
 };
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_KC
+static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi11_pdata = {
+	.clk_freq = 350000,
+	.src_clk_rate = 24000000,
+	.gsbi_protocol_code = GSBI_PROTOCOL_CODE_I2C,
+};
+#endif
 
 static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi12_pdata = {
-	.clk_freq = 100000,
+	.clk_freq = 350000,
 	.src_clk_rate = 24000000,
+	.gsbi_protocol_code = GSBI_PROTOCOL_CODE_I2C_AND_UART,
 };
 
 static struct msm_pm_sleep_status_data msm_pm_slp_sts_data = {
@@ -2409,6 +2508,7 @@ static struct platform_device msm8960_device_ext_5v_vreg __devinitdata = {
 	},
 };
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE_GPIO_NC
 static struct platform_device msm8960_device_ext_l2_vreg __devinitdata = {
 	.name	= GPIO_REGULATOR_DEV_NAME,
 	.id	= 91,
@@ -2416,6 +2516,7 @@ static struct platform_device msm8960_device_ext_l2_vreg __devinitdata = {
 		.platform_data = &msm_gpio_regulator_pdata[GPIO_VREG_ID_EXT_L2],
 	},
 };
+#endif
 
 static struct platform_device msm8960_device_ext_3p3v_vreg __devinitdata = {
 	.name	= GPIO_REGULATOR_DEV_NAME,
@@ -2474,21 +2575,89 @@ static struct msm_serial_hs_platform_data msm_uart_dm9_pdata = {
 static struct msm_serial_hs_platform_data msm_uart_dm9_pdata;
 #endif
 
+struct platform_device irdaeg_device = {
+	.name = "irdaeg",
+	.id = -1,
+	.dev		= {
+		.platform_data	= NULL,
+	},
+};
+
+struct platform_device irdaeg_device1 = {
+	.name = "irdaeg1",
+	.id = -1,
+	.dev		= {
+		.platform_data	= NULL,
+	},
+};
+
+struct platform_device irdaeg_device2 = {
+	.name = "irdaeg2",
+	.id = -1,
+	.dev		= {
+		.platform_data	= NULL,
+	},
+};
+
+#ifdef CONFIG_LEDS_KEY_PM8XXX
+	static struct platform_device pm8xxx_keyled_device = {
+		.name	= "pm8xxx_keyled",
+		.dev	= {
+			.platform_data = NULL,
+		},
+	};
+#endif
+
+#ifdef CONFIG_DTVTUNER_PM
+struct dtvtuner_pm_platform_data dtvtuner_pm_data = {
+	.gpio_rst = D_DTVTUNER_DEVICE_PORT_RESET,
+	.regulator_id  = "8921_l12",
+};
+
+struct platform_device dtvtuner_pm_device = {
+	.name = D_DTVTUNER_PM_DRIVER_NAME,
+	.id = 0,
+	.dev = {
+		.platform_data = &dtvtuner_pm_data,
+	},
+};
+#endif
+
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+static struct resource ram_console_resource[] = {
+	{
+		.flags	= IORESOURCE_MEM,
+	}
+};
+
+struct platform_device ram_console_device = {
+	.name = "ram_console",
+	.id = -1,
+	.num_resources  = ARRAY_SIZE(ram_console_resource),
+	.resource       = ram_console_resource,
+};
+#endif
+
 static struct platform_device *common_devices[] __initdata = {
 	&msm8960_device_acpuclk,
 	&msm8960_device_dmov,
 	&msm_device_smd,
-	&msm_device_uart_dm6,
 	&msm_device_uart_dm9,
 	&msm_device_saw_core0,
 	&msm_device_saw_core1,
 	&msm8960_device_ext_5v_vreg,
 	&msm8960_device_ssbi_pmic,
 	&msm8960_device_ext_otg_sw_vreg,
-	&msm8960_device_qup_spi_gsbi1,
+/*	&msm8960_device_qup_spi_gsbi1,*/
 	&msm8960_device_qup_i2c_gsbi3,
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	&msm8960_device_qup_i2c_gsbi4,
 	&msm8960_device_qup_i2c_gsbi10,
+#endif
+	&msm8960_device_qup_i2c_gsbi2,
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_KC
+	&msm8960_device_qup_i2c_gsbi11,
+#endif
 #ifndef CONFIG_MSM_DSPS
 	&msm8960_device_qup_i2c_gsbi12,
 #endif
@@ -2531,7 +2700,9 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm_device_tsif[0],
 #endif
 #endif
+#ifdef CONFIG_TSPP
 	&msm_device_tspp,
+#endif
 #ifdef CONFIG_HW_RANDOM_MSM
 	&msm_device_rng,
 #endif
@@ -2555,11 +2726,25 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm8960_cpu_idle_device,
 	&msm8960_msm_gov_device,
 	&msm8960_device_cache_erp,
+	&msm8960_device_uart_gsbi4,
+	&irdaeg_device,
+	&irdaeg_device1,
+	&irdaeg_device2,
 	&msm8960_device_ebi1_ch0_erp,
 	&msm8960_device_ebi1_ch1_erp,
 	&msm8960_cache_dump_device,
 	&msm8960_iommu_domain_device,
 	&msm_tsens_device,
+#ifdef CONFIG_LEDS_KEY_PM8XXX
+	&pm8xxx_keyled_device,
+#endif
+#ifdef CONFIG_DTVTUNER_PM
+	&dtvtuner_pm_device,
+#endif
+	&msm8960_device_uart_gsbi12,
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+    &ram_console_device,
+#endif
 };
 
 static struct platform_device *sim_devices[] __initdata = {
@@ -2684,14 +2869,25 @@ static struct platform_device *cdp_devices[] __initdata = {
 
 static void __init msm8960_i2c_init(void)
 {
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	msm8960_device_qup_i2c_gsbi4.dev.platform_data =
 					&msm8960_i2c_qup_gsbi4_pdata;
+#endif
 
 	msm8960_device_qup_i2c_gsbi3.dev.platform_data =
 					&msm8960_i2c_qup_gsbi3_pdata;
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	msm8960_device_qup_i2c_gsbi10.dev.platform_data =
 					&msm8960_i2c_qup_gsbi10_pdata;
+#endif
+	msm8960_device_qup_i2c_gsbi2.dev.platform_data =
+					&msm8960_i2c_qup_gsbi2_pdata;
+
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_KC
+	msm8960_device_qup_i2c_gsbi11.dev.platform_data =
+					&msm8960_i2c_qup_gsbi11_pdata;
+#endif
 
 	msm8960_device_qup_i2c_gsbi12.dev.platform_data =
 					&msm8960_i2c_qup_gsbi12_pdata;
@@ -2811,6 +3007,71 @@ struct i2c_registry {
 	struct i2c_board_info *info;
 	int                    len;
 };
+#if 0
+static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
+	{
+		I2C_BOARD_INFO("IU111F3", 0x34 >> 1),
+	},
+	{
+		I2C_BOARD_INFO("DW9714", 0x18 >> 1),
+	},
+};
+#endif
+static struct i2c_board_info prime_boardinfo[] __initdata = {
+#ifdef CONFIG_S5K8AAY
+	{
+//		I2C_BOARD_INFO("S5K8AAY", 0x7A >> 1),
+		I2C_BOARD_INFO("s5k8aay", 0x7A),
+		.platform_data = &msm_camera_sensor_s5k8aay_data,
+	},
+#endif
+#ifdef CONFIG_MT9D113
+	{
+		I2C_BOARD_INFO("mt9d113", 0x7A),
+		.platform_data = &msm_camera_sensor_mt9d113_data,
+	},
+#endif
+	{
+		I2C_BOARD_INFO("TDPJ3-A13A", 0xC6 >> 1),
+	},
+	{
+		I2C_BOARD_INFO("LM3533", 0x6C >> 1),
+	},
+	{
+		I2C_BOARD_INFO("LC898300", 0x93 >> 1),
+	},
+	{
+		I2C_BOARD_INFO("LM48560", 0xDE >> 1),
+	},
+	{
+		I2C_BOARD_INFO("S_7780A", 0x80 >> 1),
+	},
+};
+
+static struct i2c_board_info touchp_i2c_info[] __initdata = {
+	{
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_KC
+		MXT_BOARD_INFO,
+		.platform_data = &mxt_platform_data,
+		.irq = MSM_GPIO_TO_INT(MXT_TS_GPIO_IRQ),
+#endif /* CONFIG_TOUCHSCREEN_ATMEL_MXT_KC */
+	},
+};
+
+static struct i2c_board_info sensor_i2c_info[] __initdata = {
+	{
+		I2C_BOARD_INFO("K2DH", 0x30 >> 1),
+	},
+	{
+		I2C_BOARD_INFO("YAS523B", 0x5C >> 1),
+	},
+	{
+		I2C_BOARD_INFO("L3G3200D", 0xD4 >> 1),
+	},
+	{
+		I2C_BOARD_INFO("APDS-9900", 0x72 >> 1),
+	},
+};
 
 /* Sensors DSPS platform data */
 #ifdef CONFIG_MSM_DSPS
@@ -2881,6 +3142,7 @@ static void __init msm8960_init_hsic(void)
 #endif
 }
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 #ifdef CONFIG_ISL9519_CHARGER
 static struct isl_platform_data isl_data __initdata = {
 	.valid_n_gpio		= 0,	/* Not required when notify-by-pmic */
@@ -2907,8 +3169,10 @@ static struct i2c_board_info liquid_io_expander_i2c_info[] __initdata = {
 		.platform_data = &msm8960_sx150x_data[SX150X_LIQUID]
 	},
 };
+#endif
 
 static struct i2c_registry msm8960_i2c_devices[] __initdata = {
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 #ifdef CONFIG_ISL9519_CHARGER
 	{
 		I2C_LIQUID,
@@ -2917,18 +3181,22 @@ static struct i2c_registry msm8960_i2c_devices[] __initdata = {
 		ARRAY_SIZE(isl_charger_i2c_info),
 	},
 #endif /* CONFIG_ISL9519_CHARGER */
+#ifdef CONFIG_TOUCHSCREEN_CYTTSP_I2C
 	{
 		I2C_SURF | I2C_FFA | I2C_FLUID,
 		MSM_8960_GSBI3_QUP_I2C_BUS_ID,
 		cyttsp_info,
 		ARRAY_SIZE(cyttsp_info),
 	},
+#endif
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT
 	{
 		I2C_LIQUID,
 		MSM_8960_GSBI3_QUP_I2C_BUS_ID,
 		mxt_device_info,
 		ARRAY_SIZE(mxt_device_info),
 	},
+#endif
 	{
 		I2C_SURF | I2C_FFA | I2C_LIQUID,
 		MSM_8960_GSBI10_QUP_I2C_BUS_ID,
@@ -2947,6 +3215,33 @@ static struct i2c_registry msm8960_i2c_devices[] __initdata = {
 		liquid_io_expander_i2c_info,
 		ARRAY_SIZE(liquid_io_expander_i2c_info),
 	},
+#endif
+#if 0
+	{
+		I2C_SURF | I2C_FFA | I2C_FLUID | I2C_LIQUID | I2C_RUMI,
+		MSM_8960_GSBI3_QUP_I2C_BUS_ID,
+		msm_camera_boardinfo,
+		ARRAY_SIZE(msm_camera_boardinfo),
+	},
+#endif
+	{
+		I2C_SURF | I2C_FFA | I2C_FLUID | I2C_LIQUID | I2C_RUMI,
+		MSM_8960_GSBI2_QUP_I2C_BUS_ID,
+		prime_boardinfo,
+		ARRAY_SIZE(prime_boardinfo),
+	},
+	{
+		I2C_SURF | I2C_FFA | I2C_FLUID | I2C_LIQUID | I2C_RUMI,
+		MSM_8960_GSBI11_QUP_I2C_BUS_ID,
+		touchp_i2c_info,
+		ARRAY_SIZE(touchp_i2c_info),
+	},
+	{
+		I2C_SURF | I2C_FFA | I2C_FLUID | I2C_LIQUID | I2C_RUMI,
+		MSM_8960_GSBI12_QUP_I2C_BUS_ID,
+		sensor_i2c_info,
+		ARRAY_SIZE(sensor_i2c_info),
+	},
 };
 #endif /* CONFIG_I2C */
 
@@ -2955,14 +3250,16 @@ static void __init register_i2c_devices(void)
 #ifdef CONFIG_I2C
 	u8 mach_mask = 0;
 	int i;
+//#ifdef QUALCOMM_ORIGINAL_FEATURE
 #ifdef CONFIG_MSM_CAMERA
 	struct i2c_registry msm8960_camera_i2c_devices = {
 		I2C_SURF | I2C_FFA | I2C_FLUID | I2C_LIQUID | I2C_RUMI,
-		MSM_8960_GSBI4_QUP_I2C_BUS_ID,
+		MSM_8960_GSBI3_QUP_I2C_BUS_ID,
 		msm8960_camera_board_info.board_info,
 		msm8960_camera_board_info.num_i2c_board_info,
 	};
 #endif
+//#endif
 
 	/* Build the matching 'supported_machs' bitmask */
 	if (machine_is_msm8960_cdp())
@@ -2980,6 +3277,8 @@ static void __init register_i2c_devices(void)
 	else
 		pr_err("unmatched machine ID in register_i2c_devices\n");
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT
 	if (machine_is_msm8960_liquid()) {
 		if (SOCINFO_VERSION_MAJOR(socinfo_get_platform_version()) == 3)
 			mxt_device_info[0].platform_data =
@@ -2988,6 +3287,8 @@ static void __init register_i2c_devices(void)
 			mxt_device_info[0].platform_data =
 						&mxt_platform_data_2d;
 	}
+#endif
+#endif
 
 	/* Run the array and install devices as appropriate */
 	for (i = 0; i < ARRAY_SIZE(msm8960_i2c_devices); ++i) {
@@ -2997,8 +3298,10 @@ static void __init register_i2c_devices(void)
 						msm8960_i2c_devices[i].len);
 	}
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	if (!mhl_platform_data.gpio_mhl_power)
 		pr_debug("mhl device configured for ext debug board\n");
+#endif
 
 #ifdef CONFIG_MSM_CAMERA
 	if (msm8960_camera_i2c_devices.machs & mach_mask)
@@ -3007,7 +3310,66 @@ static void __init register_i2c_devices(void)
 			msm8960_camera_i2c_devices.len);
 #endif
 #endif
+//#endif
 }
+
+/* for PMIC GPIO function use at IrDA */
+#define PMIC_GPIO_IRDAEG_SD 37 /* IRDAEG SD GPIO 37 */
+#define PMIC_GPIO_IRDAEG_IR_TX 32 /* IRDAEG TX GPIO 32 */
+#define PMIC_GPIO_IRDAEG_IR_RX 4 /* IRDAEG RX GPIO 04 */
+
+int irda_eg_set_pm_port(void)
+{
+	int retval;
+
+/* Set LOW at the IrDA SD port */
+	retval = gpio_request(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_SD), "IRDA SD PORT" );
+	if(retval < 0 ){
+		printk(" gpio_request()=%x\n", retval);
+		return -1;
+	}
+	gpio_set_value_cansleep(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_SD), 0);
+	gpio_free(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_SD));
+
+/* Set LOW at the IrDA IR_TX port */
+	retval = gpio_request(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_IR_TX), "IRDA IR_TX PORT" );
+	if(retval < 0 ){
+		printk(" gpio_request()=%x\n", retval);
+		return -1;
+	}
+	gpio_set_value_cansleep(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_IR_TX), 0);
+	gpio_free(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_IR_TX));
+
+/* Set IN at the IrDA IR_RX port */
+	retval = gpio_request(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_IR_RX), "IRDA IR_RX PORT" );
+	if(retval < 0 ){
+		printk(" gpio_request()=%x\n", retval);
+		return -1;
+	}
+	gpio_free(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_IR_RX));
+
+	return 0;
+}
+EXPORT_SYMBOL(irda_eg_set_pm_port);
+
+int irda_eg_unset_pm_port(void)
+{
+	int retval;
+
+/* UnSet at the IrDA RX port */
+/* UnSet at the IrDA TX port */
+
+/* Set LOW at the IrDA SD port */
+	retval = gpio_request(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_SD), "IRDA SD PORT" );
+	if(retval < 0 ){
+		printk(" gpio_request()=%x\n", retval);
+		return -1;
+	}
+	gpio_set_value_cansleep(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_SD), 1);
+	gpio_free(PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_IRDAEG_SD));
+	return 0;
+}
+EXPORT_SYMBOL(irda_eg_unset_pm_port);
 
 static void __init msm8960_sim_init(void)
 {
@@ -3078,6 +3440,8 @@ static void __init msm8960_rumi3_init(void)
 
 static void __init msm8960_cdp_init(void)
 {
+	unsigned smem_size;
+
 	if (meminfo_init(SYS_MEMORY, SZ_256M) < 0)
 		pr_err("meminfo_init() failed!\n");
 
@@ -3108,14 +3472,22 @@ static void __init msm8960_cdp_init(void)
 					machine_is_msm8960_liquid())
 		msm_device_hsic_host.dev.parent = &smsc_hub_device.dev;
 	msm8960_init_gpiomux();
-	msm8960_device_qup_spi_gsbi1.dev.platform_data =
-				&msm8960_qup_spi_gsbi1_pdata;
-	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
+/*	msm8960_device_qup_spi_gsbi1.dev.platform_data =*/
+/*				&msm8960_qup_spi_gsbi1_pdata;*/
+/*	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));*/
+
+	boot_reason = *(unsigned int *)
+		(smem_get_entry(SMEM_POWER_ON_STATUS_INFO, &smem_size));
+	printk(KERN_NOTICE "Boot Reason = 0x%02x\n", boot_reason);
+	/* Judge Board Type */
+	OEM_board_judgement();
 
 	msm8960_init_pmic();
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	if ((SOCINFO_VERSION_MAJOR(socinfo_get_version()) >= 2 &&
 		(machine_is_msm8960_mtp())) || machine_is_msm8960_liquid())
 		msm_isa1200_board_info[0].platform_data = &isa1200_1_pdata;
+#endif
 	msm8960_i2c_init();
 	msm8960_gfx_init();
 	msm_spm_init(msm_spm_data, ARRAY_SIZE(msm_spm_data));
@@ -3124,9 +3496,10 @@ static void __init msm8960_cdp_init(void)
 	platform_add_devices(msm8960_footswitch, msm8960_num_footswitch);
 	if (machine_is_msm8960_liquid())
 		platform_device_register(&msm8960_device_ext_3p3v_vreg);
+#ifdef QUALCOMM_ORIGINAL_FEATURE_GPIO_NC
 	if (machine_is_msm8960_cdp())
 		platform_device_register(&msm8960_device_ext_l2_vreg);
-
+#endif
 	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE)
 		platform_device_register(&msm8960_device_uart_gsbi8);
 	else
@@ -3147,8 +3520,10 @@ static void __init msm8960_cdp_init(void)
 	msm8960_init_cam();
 #endif
 	msm8960_init_mmc();
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	if (machine_is_msm8960_liquid())
 		mxt_init_hw_liquid();
+#endif
 	register_i2c_devices();
 	msm8960_init_fb();
 	slim_register_board_info(msm_slim_devices,
@@ -3162,6 +3537,145 @@ static void __init msm8960_cdp_init(void)
 		platform_device_register(&mdm_sglte_device);
 	}
 }
+
+#define KCC_SMEM_KERR_LOG_SIZE        65537
+#define KCC_SMEM_SBL3_BOOTVER_SIZE    16
+#define KCC_SMEM_SBL3_DNAND_DATA_SIZE (50 * 1024)
+#define KCC_SMEM_DDR_DATA_INFO_SIZE   8
+#define KCC_SMEM_KC_WM_UUID_SIZE      6
+#define KCC_SMEM_FACTORY_CMDLINE_SIZE 1024
+#define KCC_SMEM_FACTORY_USB_SIZE     8
+#define KCC_SMEM_CRASH_LOG_SIZE       512
+#define KCC_SMEM_FACTORY_OPTIONS_SIZE 4
+#define KCC_SMEM_CHG_PARAM_SIZE       160
+#define KCC_SMEM_UICC_INFO_SIZE       2
+#define KCC_SMEM_LINUXSDDL_FLAG_SIZE  8
+#define KCC_SMEM_SECUREBOOT_FLAG_SIZE 4
+#define KCC_SMEM_OEM_MODEM_KEEPALIVE_SIZE 64
+
+typedef struct {
+  unsigned int kerr_log[ (KCC_SMEM_KERR_LOG_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int sbl3_bootver[ (KCC_SMEM_SBL3_BOOTVER_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int sbl3_dnand_data[ (KCC_SMEM_SBL3_DNAND_DATA_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int sbl3_ddr_info[ (KCC_SMEM_DDR_DATA_INFO_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int sbl3_wm_uuid[ (KCC_SMEM_KC_WM_UUID_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int factory_cmdline[ (KCC_SMEM_FACTORY_CMDLINE_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int factory_usb[ (KCC_SMEM_FACTORY_USB_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int crash_log[ (KCC_SMEM_CRASH_LOG_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int factory_options[ (KCC_SMEM_FACTORY_OPTIONS_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int chg_param[ (KCC_SMEM_CHG_PARAM_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int uicc_info[ (KCC_SMEM_UICC_INFO_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int linuxsddl_flag[ (KCC_SMEM_LINUXSDDL_FLAG_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int secureboot_flag[ (KCC_SMEM_SECUREBOOT_FLAG_SIZE + 4) / sizeof(unsigned int) ];
+  unsigned int oem_modem_keepalive[ (KCC_SMEM_OEM_MODEM_KEEPALIVE_SIZE + 4) / sizeof(unsigned int) ];
+} type_kcc_smem;
+
+static type_kcc_smem    *kc_smem_addr = NULL;
+
+static void kc_smem_init( void )
+{
+  kc_smem_addr = (type_kcc_smem *)smem_find(SMEM_ID_VENDOR2, sizeof(type_kcc_smem));
+
+  if (kc_smem_addr == NULL)
+  {
+      printk(KERN_ERR
+          "%s: kc_smem_init ret error=NULL\n",__func__);
+  }
+
+  return;
+}
+
+void *kc_smem_alloc(unsigned smem_type, unsigned buf_size)
+{
+  if (kc_smem_addr == NULL)
+  {
+    kc_smem_init();
+
+      if (kc_smem_addr == NULL)
+      {
+        return( NULL );
+      }
+
+  }
+
+  switch (smem_type)
+  {
+  case SMEM_KERR_LOG:
+    if (buf_size <= KCC_SMEM_KERR_LOG_SIZE)
+      return( (void *)&kc_smem_addr->kerr_log[0] );
+    break;
+
+  case SMEM_SBL3_BOOTVER:
+    if (buf_size <= KCC_SMEM_SBL3_BOOTVER_SIZE)
+      return( (void *)&kc_smem_addr->sbl3_bootver[0] );
+    break;
+
+  case SMEM_SBL3_DNAND_DATA:
+    if (buf_size <= KCC_SMEM_SBL3_DNAND_DATA_SIZE)
+      return( (void *)&kc_smem_addr->sbl3_dnand_data[0] );
+    break;
+
+  case SMEM_DDR_DATA_INFO:
+    if (buf_size <= KCC_SMEM_DDR_DATA_INFO_SIZE)
+      return( (void *)&kc_smem_addr->sbl3_ddr_info[0] );
+    break;
+
+  case SMEM_KC_WM_UUID:
+    if (buf_size <= KCC_SMEM_KC_WM_UUID_SIZE)
+      return( (void *)&kc_smem_addr->sbl3_wm_uuid[0] );
+    break;
+
+  case SMEM_FACTORY_CMDLINE:
+	if (buf_size <= KCC_SMEM_FACTORY_CMDLINE_SIZE)
+      return( (void *)&kc_smem_addr->factory_cmdline[0] );
+	break;
+
+  case SMEM_FACTORY_USB:
+	if (buf_size <= KCC_SMEM_FACTORY_USB_SIZE)
+      return( (void *)&kc_smem_addr->factory_usb[0] );
+	break;
+
+  case SMEM_CRASH_LOG:
+    if (buf_size <= KCC_SMEM_CRASH_LOG_SIZE)
+      return( (void *)&kc_smem_addr->crash_log[0] );
+    break;
+
+  case SMEM_FACTORY_OPTIONS:
+    if (buf_size <= KCC_SMEM_FACTORY_OPTIONS_SIZE)
+      return( (void *)&kc_smem_addr->factory_options[0] );
+    break;
+
+  case SMEM_CHG_PARAM:
+    if (buf_size <= KCC_SMEM_CHG_PARAM_SIZE)
+      return( (void *)&kc_smem_addr->chg_param[0] );
+    break;
+
+  case SMEM_UICC_INFO:
+    if (buf_size <= KCC_SMEM_UICC_INFO_SIZE)
+      return( (void *)&kc_smem_addr->uicc_info[0] );
+    break;
+
+  case SMEM_LINUXSDDL_FLAG:
+    if (buf_size <= KCC_SMEM_LINUXSDDL_FLAG_SIZE)
+      return( (void *)&kc_smem_addr->linuxsddl_flag[0] );
+    break;
+
+  case SMEM_SECUREBOOT_FLAG:
+    if (buf_size <= KCC_SMEM_SECUREBOOT_FLAG_SIZE)
+      return( (void *)&kc_smem_addr->secureboot_flag[0] );
+    break;
+
+  case SMEM_OEM_MODEM_KEEPALIVE:
+    if (buf_size <= KCC_SMEM_OEM_MODEM_KEEPALIVE_SIZE)
+      return( (void *)&kc_smem_addr->oem_modem_keepalive[0] );
+    break;
+
+  default:
+    break;
+  }
+  return( NULL );
+}
+
 
 MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
 	.map_io = msm8960_map_io,

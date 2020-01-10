@@ -10,6 +10,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/workqueue.h>
 #include <linux/delay.h>
@@ -63,6 +67,14 @@ static struct msm_isp_color_fmt msm_isp_formats[] = {
 	.depth	  = 12,
 	.bitsperpxl = 8,
 	.fourcc	 = V4L2_PIX_FMT_NV21,
+	.pxlcode	= V4L2_MBUS_FMT_YUYV8_2X8, /* YUV sensor */
+	.colorspace = V4L2_COLORSPACE_JPEG,
+	},
+	{
+	.name	   = "YV12YUV",
+	.depth	  = 12,
+	.bitsperpxl = 8,
+	.fourcc	 = V4L2_PIX_FMT_YUV420M,
 	.pxlcode	= V4L2_MBUS_FMT_YUYV8_2X8, /* YUV sensor */
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	},
@@ -510,16 +522,19 @@ static int msm_mctl_open(struct msm_cam_media_controller *p_mctl,
 				 const char *const apps_id)
 {
 	int rc = 0;
-	struct msm_sensor_ctrl_t *s_ctrl = get_sctrl(p_mctl->sensor_sdev);
-	struct msm_camera_sensor_info *sinfo =
-		(struct msm_camera_sensor_info *) s_ctrl->sensordata;
-	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
+	struct msm_sensor_ctrl_t *s_ctrl;
+	struct msm_camera_sensor_info *sinfo;
+	struct msm_camera_device_platform_data *camdev;
 	uint8_t csid_core;
 	D("%s\n", __func__);
 	if (!p_mctl) {
 		pr_err("%s: param is NULL", __func__);
 		return -EINVAL;
 	}
+
+	s_ctrl = get_sctrl(p_mctl->sensor_sdev);
+	sinfo = (struct msm_camera_sensor_info *) s_ctrl->sensordata;
+	camdev = sinfo->pdata;
 
 	mutex_lock(&p_mctl->lock);
 	/* open sub devices - once only*/

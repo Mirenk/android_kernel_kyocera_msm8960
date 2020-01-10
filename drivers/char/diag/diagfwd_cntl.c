@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/slab.h>
 #include <linux/diagchar.h>
@@ -22,6 +26,9 @@
 #endif
 
 #define HDR_SIZ 8
+
+
+extern int diagchar_kioctl_flg;
 
 void diag_smd_cntl_notify(void *ctxt, unsigned event)
 {
@@ -180,8 +187,10 @@ static void diag_smd_cntl_send_req(int proc_num)
 				temp -= pkt_params->count;
 				pkt_params->params = temp;
 				flag = 1;
+			    diagchar_kioctl_flg = 0x01;
 				diagchar_ioctl(NULL, DIAG_IOCTL_COMMAND_REG,
 						 (unsigned long)pkt_params);
+			    diagchar_kioctl_flg = 0x00;
 				kfree(temp);
 			}
 			buf = buf + HDR_SIZ + data_len;

@@ -14,6 +14,12 @@
  * Author: San Mehat (san@android.com)
  *
  */
+/*********************************************************************
+ * 
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * 
+ *********************************************************************/
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -66,6 +72,7 @@
 	pr_debug("%s: %s: " fmt "\n", mmc_hostname(host->mmc), __func__ , args)
 
 #define IRQ_DEBUG 0
+#define SDHUB_SDCC_INDEX 1
 #define SPS_SDCC_PRODUCER_PIPE_INDEX	1
 #define SPS_SDCC_CONSUMER_PIPE_INDEX	2
 #define SPS_CONS_PERIPHERAL		0
@@ -147,6 +154,13 @@ msmsdcc_print_status(struct msmsdcc_host *host, char *hdr, uint32_t status)
 	pr_debug("\n");
 }
 #endif
+
+static struct mmc_host *mmchost = NULL;
+
+static void mmc_set_host(struct mmc_host *host)
+{
+	mmchost = host;
+}
 
 static void
 msmsdcc_start_command(struct msmsdcc_host *host, struct mmc_command *cmd,
@@ -2329,6 +2343,10 @@ static int msmsdcc_setup_vreg(struct msmsdcc_host *host, bool enable,
 	int rc = 0, i;
 	struct msm_mmc_slot_reg_data *curr_slot;
 	struct msm_mmc_reg_data *vreg_table[2];
+
+	if(host->mmc->index == SDHUB_SDCC_INDEX) {
+		goto out;
+	}
 
 	curr_slot = host->plat->vreg_data;
 	if (!curr_slot) {
@@ -5354,8 +5372,9 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->pm_caps |= MMC_PM_KEEP_POWER | MMC_PM_WAKE_SDIO_IRQ;
 	mmc->caps |= plat->mmc_bus_width;
 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED;
-	mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE;
+	mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
 	mmc->caps |= MMC_CAP_HW_RESET;
+
 	/*
 	 * If we send the CMD23 before multi block write/read command
 	 * then we need not to send CMD12 at the end of the transfer.
@@ -5591,6 +5610,12 @@ msmsdcc_probe(struct platform_device *pdev)
 		if (ret)
 			goto remove_max_bus_bw_file;
 	}
+
+	if(mmc->index == SDHUB_SDCC_INDEX)
+	{
+		mmc_set_host(mmc);
+	}
+
 	host->idle_timeout.show = show_idle_timeout;
 	host->idle_timeout.store = store_idle_timeout;
 	sysfs_attr_init(&host->idle_timeout.attr);
@@ -6001,6 +6026,11 @@ static int msmsdcc_runtime_idle(struct device *dev)
 	if (host->plat->is_sdio_al_client)
 		return 0;
 
+	if(mmc->index == SDHUB_SDCC_INDEX)
+	{
+		return -EAGAIN;
+	}
+  
 	/* Idle timeout is not configurable for now */
 	pm_schedule_suspend(dev, host->idle_tout_ms);
 
@@ -6230,3 +6260,9 @@ static int __init msmsdcc_dbg_init(void)
 	return 0;
 }
 #endif
+
+struct mmc_host *mmc_get_host(void)
+{
+    return mmchost;
+}
+EXPORT_SYMBOL_GPL(mmc_get_host);

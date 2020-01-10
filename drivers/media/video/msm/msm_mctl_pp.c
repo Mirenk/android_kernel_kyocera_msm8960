@@ -10,6 +10,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/workqueue.h>
 #include <linux/delay.h>
@@ -299,7 +303,18 @@ static int msm_mctl_pp_get_phy_addr(
 	struct videobuf2_contig_pmem *mem;
 	int i, buf_idx = 0;
 
+
+	if( ( (unsigned int)frame_handle ) <= 0x10)
+	{
+		pr_err("%s frame_handle=0x%x ERR\n",__func__,(unsigned int)frame_handle);
+		return -1;
+	}
 	vb = (struct msm_frame_buffer *)frame_handle;
+	if( ( (unsigned int)&vb->vidbuf ) <= 0x10)
+	{
+		pr_err("%s vb->vidbuf=0x%x \n",__func__,(unsigned int)&vb->vidbuf);
+		return -1;
+	}
 	buf_idx = vb->vidbuf.v4l2_buf.index;
 	memset(pp_frame, 0, sizeof(struct msm_pp_frame));
 	pp_frame->handle = (uint32_t)vb;
@@ -310,12 +325,19 @@ static int msm_mctl_pp_get_phy_addr(
 	 * Also use this to check the number of planes in
 	 * this buffer.*/
 	mem = vb2_plane_cookie(&vb->vidbuf, 0);
+	if((unsigned int)mem <= 0x10)
+	{
+		pr_err("%s vb2_plane_cookie ret=NULL \n",__func__);
+		return -1;
+	}
 	pp_frame->image_type = (unsigned short)mem->path;
 	if (mem->buffer_type == VIDEOBUF2_SINGLE_PLANE) {
 		pp_frame->num_planes = 1;
 		pp_frame->sp.addr_offset = mem->addr_offset;
 		pp_frame->sp.phy_addr =
 			videobuf2_to_pmem_contig(&vb->vidbuf, 0);
+			if(pp_frame->sp.phy_addr == 0)
+				 return -1;
 		pp_frame->sp.y_off = 0;
 		pp_frame->sp.cbcr_off = mem->offset.sp_off.cbcr_off;
 		pp_frame->sp.length = mem->size;
@@ -324,9 +346,16 @@ static int msm_mctl_pp_get_phy_addr(
 		pp_frame->num_planes = pcam_inst->plane_info.num_planes;
 		for (i = 0; i < pp_frame->num_planes; i++) {
 			mem = vb2_plane_cookie(&vb->vidbuf, i);
+			if((unsigned int)mem <= 0x10)
+			{
+				pr_err("%s vb2_plane_cookie ret=NULL \n",__func__);
+				return -1;
+			}
 			pp_frame->mp[i].addr_offset = mem->addr_offset;
 			pp_frame->mp[i].phy_addr =
 				videobuf2_to_pmem_contig(&vb->vidbuf, i);
+			if(pp_frame->mp[i].phy_addr == 0)
+				 return -1;
 			pp_frame->mp[i].data_offset =
 			pcam_inst->buf_offset[buf_idx][i].data_offset;
 			pp_frame->mp[i].fd = (int)mem->vaddr;

@@ -49,6 +49,11 @@
  * - GET_STATUS(device) - always reports 0
  * - Gadget API (majority of optional features)
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
+
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/dmapool.h>
@@ -2069,11 +2074,15 @@ static int _gadget_stop_activity(struct usb_gadget *gadget)
 	struct usb_ep *ep;
 	struct ci13xxx    *udc = container_of(gadget, struct ci13xxx, gadget);
 	unsigned long flags;
+	int disconnect = 0;
 
 	trace("%p", gadget);
 
 	if (gadget == NULL)
 		return -EINVAL;
+
+	if(udc->configured)
+		disconnect =1;
 
 	spin_lock_irqsave(udc->lock, flags);
 	udc->gadget.speed = USB_SPEED_UNKNOWN;
@@ -2094,7 +2103,8 @@ static int _gadget_stop_activity(struct usb_gadget *gadget)
 	usb_ep_fifo_flush(&udc->ep0out.ep);
 	usb_ep_fifo_flush(&udc->ep0in.ep);
 
-	udc->driver->disconnect(gadget);
+	if(disconnect || !udc->vbus_active)
+		udc->driver->disconnect(gadget);
 
 	/* make sure to disable all endpoints */
 	gadget_for_each_ep(ep, gadget) {

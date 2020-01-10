@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 /* drivers/video/msm_fb/mdp.c
  *
  * MSM MDP Interface (used by framebuffer core)
@@ -1440,6 +1444,7 @@ void mdp_disable_irq_nosync(uint32 term)
 void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd)
 {
 	unsigned long flag;
+    DISP_LOCAL_LOG_EMERG("DISP mdp_pipe_kickoff S\n");
 	/* complete all the writes before starting */
 	wmb();
 
@@ -1527,6 +1532,7 @@ void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd)
 		outpdw(MDP_BASE + 0x004C, 0x0);
 	}
 #endif
+    DISP_LOCAL_LOG_EMERG("DISP mdp_pipe_kickoff E\n");
 }
 
 static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];

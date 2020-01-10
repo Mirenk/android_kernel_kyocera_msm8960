@@ -14,6 +14,11 @@
  * QUP driver for Qualcomm MSM platforms
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * (C) 2013 KYOCERA Corporation
+ */
 
 /* #define DEBUG */
 
@@ -770,9 +775,20 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		int fs_div;
 		int hs_div;
 		uint32_t fifo_reg;
+		uint32_t gsbi_config;
 
 		if (dev->gsbi) {
-			writel_relaxed(0x2 << 4, dev->gsbi);
+			if (dev->pdata->gsbi_protocol_code) {
+				dev_dbg(dev->dev, "gsbi_protocol_code = 0x%x\n", dev->pdata->gsbi_protocol_code);
+				gsbi_config = readl_relaxed(dev->gsbi);
+				dev_dbg(dev->dev, "Read  gsbi_config  = 0x%x\n", gsbi_config);
+				gsbi_config = ((gsbi_config & ~(0x70)) | (dev->pdata->gsbi_protocol_code & 0x70));
+				dev_dbg(dev->dev, "Write gsbi_config  = 0x%x\n", gsbi_config);
+				writel_relaxed(gsbi_config, dev->gsbi);
+				dev_dbg(dev->dev, "Read  gsbi_config  = 0x%x\n", readl_relaxed(dev->gsbi));
+			} else {
+				writel_relaxed(0x2 << 4, dev->gsbi);
+			}
 			/* GSBI memory is not in the same 1K region as other
 			 * QUP registers. mb() here ensures that the GSBI
 			 * register is updated in correct order and that the
@@ -1341,6 +1357,8 @@ blsp_core_init:
 	} else {
 		if (dev->dev->of_node)
 			of_i2c_register_devices(&dev->adapter);
+		if (pdata->msm_i2c_init_device)
+			pdata->msm_i2c_init_device(&dev->adapter);
 		return 0;
 	}
 

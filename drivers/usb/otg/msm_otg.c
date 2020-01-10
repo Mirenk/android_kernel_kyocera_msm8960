@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
+
 
 #include <linux/module.h>
 #include <linux/device.h>
@@ -100,6 +105,12 @@ static const int vdd_val[VDD_TYPE_MAX][VDD_VAL_MAX] = {
 			[VDD_MAX]	= USB_PHY_VDD_DIG_VOL_MAX,
 		},
 };
+
+bool is_vbus_active(void)
+{
+	struct msm_otg *motg = the_msm_otg;
+	return (readl(USB_OTGSC) & OTGSC_BSV) ? true : false;
+}
 
 static int msm_hsusb_ldo_init(struct msm_otg *motg, int init)
 {
@@ -454,6 +465,7 @@ static int msm_otg_reset(struct usb_phy *phy)
 	int ret;
 	u32 val = 0;
 	u32 ulpi_val = 0;
+	u32 hw_rev_number, *hw_rev_reg = 0, cs_version; 
 
 	/*
 	 * USB PHY and Link reset also reset the USB BAM.
@@ -503,9 +515,73 @@ static int msm_otg_reset(struct usb_phy *phy)
 		writel_relaxed(val, USB_OTGSC);
 		ulpi_write(phy, ulpi_val, ULPI_USB_INT_EN_RISE);
 		ulpi_write(phy, ulpi_val, ULPI_USB_INT_EN_FALL);
+		ulpi_write(phy, 0x34, 0x82);
 	} else if (pdata->otg_control == OTG_PMIC_CONTROL) {
 		ulpi_write(phy, OTG_COMP_DISABLE,
 			ULPI_SET(ULPI_PWR_CLK_MNG_REG));
+
+		hw_rev_reg = ioremap(0x00802054,4);
+		hw_rev_number = readl(hw_rev_reg);
+		
+	    switch ( hw_rev_number )
+		{
+			/* MSM Model */
+			/* MSM8960 Model */
+			case 0x406B00E1:
+				cs_version = 31;            
+				break;
+			case 0x706B00E1:
+				cs_version = 321;           
+				break;
+			case 0x406B10E1:
+				cs_version = 31;
+				break;
+			case 0x706B10E1:
+				cs_version = 321;           
+				break;
+			case 0x406B40E1:
+				cs_version = 31;
+				break;
+			case 0x706B40E1:
+				cs_version = 321;           
+				break;
+			case 0x406B50E1:
+				cs_version = 31;           
+				break;
+			case 0x706B50E1:
+				cs_version = 321;           
+				break;
+			case 0x406BC0E1:
+				cs_version = 31;            
+				break;
+			case 0x706BC0E1:
+				cs_version = 321;           
+				break;
+			case 0x406BD0E1:
+				cs_version = 31;            
+				break;
+			case 0x706BD0E1:
+				cs_version = 321;           
+				break;
+			default:
+				cs_version = 321;           
+				break;
+		}
+		
+		if(cs_version == 31)
+		{
+		  /* CS v3.1 */
+		  ulpi_write(phy, 0x3B, 0x81);
+		  ulpi_write(phy, 0x34, 0x82);
+		}
+		else
+		{
+		  /* CS v3.2.1 */
+		  ulpi_write(phy, 0x4B, 0x81);
+		  ulpi_write(phy, 0x34, 0x82);	
+		}
+		iounmap(hw_rev_reg);
+
 		/* Enable PMIC pull-up */
 		pm8xxx_usb_id_pullup(1);
 	}
@@ -1005,13 +1081,16 @@ psy_not_supported:
 
 static int msm_otg_notify_chg_type(struct msm_otg *motg)
 {
-	static int charger_type;
+	int charger_type;
+	static int chg_type = USB_INVALID_CHARGER;
 	/*
 	 * TODO
 	 * Unify OTG driver charger types and power supply charger types
 	 */
-	if (charger_type == motg->chg_type)
+	if (chg_type == motg->chg_type)
 		return 0;
+
+	chg_type = motg->chg_type;
 
 	if (motg->chg_type == USB_SDP_CHARGER)
 		charger_type = POWER_SUPPLY_TYPE_USB;
@@ -1850,7 +1929,7 @@ static const char *chg_to_string(enum usb_chg_type chg_type)
 }
 
 #define MSM_CHG_DCD_POLL_TIME		(100 * HZ/1000) /* 100 msec */
-#define MSM_CHG_DCD_MAX_RETRIES		6 /* Tdcd_tmout = 6 * 100 msec */
+#define MSM_CHG_DCD_MAX_RETRIES		50 /* Tdcd_tmout = 50 * 100 msec */
 #define MSM_CHG_PRIMARY_DET_TIME	(50 * HZ/1000) /* TVDPSRC_ON */
 #define MSM_CHG_SECONDARY_DET_TIME	(50 * HZ/1000) /* TVDMSRC_ON */
 static void msm_chg_detect_work(struct work_struct *w)

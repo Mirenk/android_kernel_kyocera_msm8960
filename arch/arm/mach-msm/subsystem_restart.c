@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 
 #define pr_fmt(fmt) "subsys-restart: %s(): " fmt, __func__
 
@@ -68,6 +72,13 @@ static LIST_HEAD(subsystem_list);
 static DEFINE_SPINLOCK(subsystem_list_lock);
 static DEFINE_MUTEX(soc_order_reg_lock);
 static DEFINE_MUTEX(restart_log_mutex);
+
+extern void set_kcj_crash_info(void);
+extern void dump_kcj_log(void);
+extern void set_modemlog_info(void);
+extern void set_smem_crash_system_kernel(void);
+extern void set_smem_crash_kind_panic(void);
+extern void set_smem_crash_info_data( const char *pdata );
 
 /* SOC specific restart orders go here */
 
@@ -379,6 +390,9 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	 */
 	mutex_unlock(shutdown_lock);
 
+	set_modemlog_info();
+	set_kcj_crash_info();
+	dump_kcj_log();
 	/* Collect ram dumps for all subsystems in order here */
 	for (i = 0; i < restart_list_count; i++) {
 		if (!restart_list[i])
@@ -535,6 +549,10 @@ static int ssr_panic_handler(struct notifier_block *this,
 				unsigned long event, void *ptr)
 {
 	struct subsys_data *subsys;
+
+	set_smem_crash_system_kernel();
+	set_smem_crash_kind_panic();
+	set_smem_crash_info_data( " " );
 
 	list_for_each_entry(subsys, &subsystem_list, list)
 		if (subsys->crash_shutdown)

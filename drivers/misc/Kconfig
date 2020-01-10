@@ -1,4 +1,10 @@
 #
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2011 KYOCERA Corporation
+# (C) 2012 KYOCERA Corporation
+#
+
+#
 # Misc strange devices
 #
 
@@ -570,6 +576,11 @@ config TSIF_DEBUG
 	---help---
 	  This turns on debugging information for the tsif driver
 
+config DTVTUNER_PM
+	bool "dtvtuner_pm"
+	depends on ARCH_MSM
+	default m
+
 config TSPP
 	depends on ARCH_MSM
 	tristate "TSPP (Transport Stream Packet Processor) Support"
@@ -601,6 +612,14 @@ config PMIC8XXX_VIBRATOR
 	help
 	  This option enables device driver support for the vibrator
 	  on the PM8XXX chips. The vibrator is controlled using the
+	  timed output class.
+
+config LC898300_VIBRATOR
+	tristate "LC89830 Vibrator support"
+	depends on ANDROID_TIMED_OUTPUT
+	help
+	  This option enables device driver support for the vibrator
+	  on the LC898300 chips. The vibrator is controlled using the
 	  timed output class.
 
 config PMIC8XXX_NFC

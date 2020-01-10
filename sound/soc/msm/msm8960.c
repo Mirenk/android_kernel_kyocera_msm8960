@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -59,14 +63,26 @@
 #define TABLA_MBHC_DEF_BUTTONS 8
 #define TABLA_MBHC_DEF_RLOADS 5
 
+#if 0
 #define JACK_DETECT_GPIO 38
+#else
+#define JACK_DETECT_GPIO 42
+#endif
 #define JACK_DETECT_INT PM8921_GPIO_IRQ(PM8921_IRQ_BASE, JACK_DETECT_GPIO)
 #define JACK_US_EURO_SEL_GPIO 35
 
+#define HS_SW_GPIO_CFG \
+   GPIO_CFG(TABLA_HS_SW_GPIO, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+
 static u32 top_spk_pamp_gpio  = PM8921_GPIO_PM_TO_SYS(18);
+#if 0
 static u32 bottom_spk_pamp_gpio = PM8921_GPIO_PM_TO_SYS(19);
+#endif
+
 static int msm8960_spk_control;
+#if 0
 static int msm8960_ext_bottom_spk_pamp;
+#endif
 static int msm8960_ext_top_spk_pamp;
 static int msm8960_slim_0_rx_ch = 1;
 static int msm8960_slim_0_tx_ch = 1;
@@ -117,7 +133,7 @@ static struct mutex cdc_mclk_mutex;
 static void msm8960_enable_ext_spk_amp_gpio(u32 spk_amp_gpio)
 {
 	int ret = 0;
-
+#if 0
 	struct pm_gpio param = {
 		.direction      = PM_GPIO_DIR_OUT,
 		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
@@ -147,13 +163,17 @@ static void msm8960_enable_ext_spk_amp_gpio(u32 spk_amp_gpio)
 		}
 
 	} else if (spk_amp_gpio == top_spk_pamp_gpio) {
+#else
 
+    if (spk_amp_gpio == top_spk_pamp_gpio) {
+#endif
 		ret = gpio_request(top_spk_pamp_gpio, "TOP_SPK_AMP");
 		if (ret) {
 			pr_err("%s: Error requesting GPIO %d\n", __func__,
 				top_spk_pamp_gpio);
 			return;
 		}
+#if 0
 		ret = pm8xxx_gpio_config(top_spk_pamp_gpio, &param);
 		if (ret)
 			pr_err("%s: Failed to configure Top Spk Ampl"
@@ -162,6 +182,9 @@ static void msm8960_enable_ext_spk_amp_gpio(u32 spk_amp_gpio)
 			pr_debug("%s: enable Top spkr amp gpio\n", __func__);
 			gpio_direction_output(top_spk_pamp_gpio, 1);
 		}
+#else
+		gpio_direction_output(top_spk_pamp_gpio, 1);
+#endif
 	} else {
 		pr_err("%s: ERROR : Invalid External Speaker Ampl GPIO."
 			" gpio = %u\n", __func__, spk_amp_gpio);
@@ -171,6 +194,7 @@ static void msm8960_enable_ext_spk_amp_gpio(u32 spk_amp_gpio)
 
 static void msm8960_ext_spk_power_amp_on(u32 spk)
 {
+#if 0
 	if (spk & (BOTTOM_SPK_AMP_POS | BOTTOM_SPK_AMP_NEG)) {
 
 		if ((msm8960_ext_bottom_spk_pamp & BOTTOM_SPK_AMP_POS) &&
@@ -193,6 +217,9 @@ static void msm8960_ext_spk_power_amp_on(u32 spk)
 		}
 
 	} else if  (spk & (TOP_SPK_AMP_POS | TOP_SPK_AMP_NEG | TOP_SPK_AMP)) {
+#else
+	if  (spk & (TOP_SPK_AMP_POS | TOP_SPK_AMP_NEG | TOP_SPK_AMP)) {
+#endif
 
 		pr_debug("%s: top_spk_amp_state = 0x%x spk_event = 0x%x\n",
 			__func__, msm8960_ext_top_spk_pamp, spk);
@@ -212,6 +239,7 @@ static void msm8960_ext_spk_power_amp_on(u32 spk)
 			(msm8960_ext_top_spk_pamp & TOP_SPK_AMP_NEG)) ||
 				(msm8960_ext_top_spk_pamp & TOP_SPK_AMP)) {
 
+			usleep_range(10000, 10000);
 			msm8960_enable_ext_spk_amp_gpio(top_spk_pamp_gpio);
 			pr_debug("%s: sleeping 4 ms after turning on "
 				" external Top Speaker Ampl\n", __func__);
@@ -227,6 +255,7 @@ static void msm8960_ext_spk_power_amp_on(u32 spk)
 
 static void msm8960_ext_spk_power_amp_off(u32 spk)
 {
+#if 0
 	if (spk & (BOTTOM_SPK_AMP_POS | BOTTOM_SPK_AMP_NEG)) {
 
 		if (!msm8960_ext_bottom_spk_pamp)
@@ -242,6 +271,9 @@ static void msm8960_ext_spk_power_amp_off(u32 spk)
 		usleep_range(4000, 4000);
 
 	} else if (spk & (TOP_SPK_AMP_POS | TOP_SPK_AMP_NEG | TOP_SPK_AMP)) {
+#else
+	if (spk & (TOP_SPK_AMP_POS | TOP_SPK_AMP_NEG | TOP_SPK_AMP)) {
+#endif
 
 		pr_debug("%s: top_spk_amp_state = 0x%x spk_event = 0x%x\n",
 				__func__, msm8960_ext_top_spk_pamp, spk);
@@ -284,13 +316,17 @@ static void msm8960_ext_control(struct snd_soc_codec *codec)
 
 	pr_debug("%s: msm8960_spk_control = %d", __func__, msm8960_spk_control);
 	if (msm8960_spk_control == MSM8960_SPK_ON) {
+#if 0
 		snd_soc_dapm_enable_pin(dapm, "Ext Spk Bottom Pos");
 		snd_soc_dapm_enable_pin(dapm, "Ext Spk Bottom Neg");
+#endif
 		snd_soc_dapm_enable_pin(dapm, "Ext Spk Top Pos");
 		snd_soc_dapm_enable_pin(dapm, "Ext Spk Top Neg");
 	} else {
+#if 0
 		snd_soc_dapm_disable_pin(dapm, "Ext Spk Bottom Pos");
 		snd_soc_dapm_disable_pin(dapm, "Ext Spk Bottom Neg");
+#endif
 		snd_soc_dapm_disable_pin(dapm, "Ext Spk Top Pos");
 		snd_soc_dapm_disable_pin(dapm, "Ext Spk Top Neg");
 	}
@@ -429,10 +465,10 @@ static const struct snd_soc_dapm_widget msm8960_dapm_widgets[] = {
 
 	SND_SOC_DAPM_SUPPLY("MCLK",  SND_SOC_NOPM, 0, 0,
 	msm8960_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-
+#if 0
 	SND_SOC_DAPM_SPK("Ext Spk Bottom Pos", msm8960_spkramp_event),
 	SND_SOC_DAPM_SPK("Ext Spk Bottom Neg", msm8960_spkramp_event),
-
+#endif
 	SND_SOC_DAPM_SPK("Ext Spk Top Pos", msm8960_spkramp_event),
 	SND_SOC_DAPM_SPK("Ext Spk Top Neg", msm8960_spkramp_event),
 	SND_SOC_DAPM_SPK("Ext Spk Top", msm8960_spkramp_event),
@@ -445,8 +481,10 @@ static const struct snd_soc_dapm_widget msm8960_dapm_widgets[] = {
 
 	SND_SOC_DAPM_MIC("Digital Mic1", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic2", NULL),
+#if	0
 	SND_SOC_DAPM_MIC("Digital Mic3", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic4", NULL),
+#endif
 	SND_SOC_DAPM_MIC("Digital Mic5", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic6", NULL),
 
@@ -458,12 +496,18 @@ static const struct snd_soc_dapm_route common_audio_map[] = {
 	{"LDO_H", NULL, "MCLK"},
 
 	/* Speaker path */
+#if 0
 	{"Ext Spk Bottom Pos", NULL, "LINEOUT1"},
 	{"Ext Spk Bottom Neg", NULL, "LINEOUT3"},
-
+#else
+	{"Ext Spk Top Pos", NULL, "LINEOUT1"},
+	{"Ext Spk Top Neg", NULL, "LINEOUT3"},
+#endif
+#if 0
 	{"Ext Spk Top Pos", NULL, "LINEOUT2"},
 	{"Ext Spk Top Neg", NULL, "LINEOUT4"},
 	{"Ext Spk Top", NULL, "LINEOUT5"},
+#endif
 
 	/* Microphone path */
 	{"AMIC1", NULL, "MIC BIAS1 Internal1"},
@@ -478,9 +522,14 @@ static const struct snd_soc_dapm_route common_audio_map[] = {
 	 * routing entries below are based on bias arrangement
 	 * on FLUID.
 	 */
+#if 0
 	{"AMIC3", NULL, "MIC BIAS3 Internal1"},
 	{"MIC BIAS3 Internal1", NULL, "MIC BIAS2 External"},
 	{"MIC BIAS2 External", NULL, "ANCRight Headset Mic"},
+#else
+	{"AMIC3", NULL, "MIC BIAS3 External"},
+	{"MIC BIAS3 External", NULL, "ANCRight Headset Mic"},
+#endif
 	{"AMIC4", NULL, "MIC BIAS1 Internal2"},
 	{"MIC BIAS1 Internal2", NULL, "MIC BIAS2 External"},
 	{"MIC BIAS2 External", NULL, "ANCLeft Headset Mic"},
@@ -513,17 +562,19 @@ static const struct snd_soc_dapm_route common_audio_map[] = {
 	 * Digital Mic GM1 on CDP mainboard.
 	 * Conncted to DMIC4 Input on Tabla codec.
 	 */
+#if 0
 	{"DMIC4", NULL, "MIC BIAS3 External"},
 	{"MIC BIAS3 External", NULL, "Digital Mic3"},
-
+#endif
 	/**
 	 * Digital Mic4. Back top Digital Mic on Fluid.
 	 * Digital Mic GM2 on CDP mainboard.
 	 * Conncted to DMIC3 Input on Tabla codec.
 	 */
+#if 0
 	{"DMIC3", NULL, "MIC BIAS3 External"},
 	{"MIC BIAS3 External", NULL, "Digital Mic4"},
-
+#endif
 	/**
 	 * Digital Mic5. Front top Digital Mic on Fluid.
 	 * Digital Mic GM3 on CDP mainboard.
@@ -882,6 +933,7 @@ static int msm8960_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_codec *codec = rtd->codec;
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+#if 0
 	struct pm_gpio jack_gpio_cfg = {
 		.direction = PM_GPIO_DIR_IN,
 		.pull = PM_GPIO_PULL_UP_1P5,
@@ -889,12 +941,14 @@ static int msm8960_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		.vin_sel = 2,
 		.inv_int_pol = 0,
 	};
-
+#endif
 	pr_debug("%s(), dev_name%s\n", __func__, dev_name(cpu_dai->dev));
 
 	if (machine_is_msm8960_liquid()) {
 		top_spk_pamp_gpio = (PM8921_GPIO_PM_TO_SYS(19));
+#if 0
 		bottom_spk_pamp_gpio = (PM8921_GPIO_PM_TO_SYS(18));
+#endif
 	}
 
 	snd_soc_dapm_new_controls(dapm, msm8960_dapm_widgets,
@@ -902,9 +956,10 @@ static int msm8960_audrx_init(struct snd_soc_pcm_runtime *rtd)
 
 	snd_soc_dapm_add_routes(dapm, common_audio_map,
 		ARRAY_SIZE(common_audio_map));
-
+#if 0
 	snd_soc_dapm_enable_pin(dapm, "Ext Spk Bottom Pos");
 	snd_soc_dapm_enable_pin(dapm, "Ext Spk Bottom Neg");
+#endif
 	snd_soc_dapm_enable_pin(dapm, "Ext Spk Top Pos");
 	snd_soc_dapm_enable_pin(dapm, "Ext Spk Top Neg");
 
@@ -931,11 +986,19 @@ static int msm8960_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	if (machine_is_msm8960_cdp())
 		mbhc_cfg.swap_gnd_mic = msm8960_swap_gnd_mic;
 
+	hs_detect_use_gpio = true;
+
 	if (hs_detect_use_gpio) {
 		mbhc_cfg.gpio = PM8921_GPIO_PM_TO_SYS(JACK_DETECT_GPIO);
 		mbhc_cfg.gpio_irq = JACK_DETECT_INT;
+		err = gpio_request(mbhc_cfg.gpio, "HEADSET_DET");
+		if (err < 0) {
+			pr_err("%s: gpio_request %d failed %d\n", __func__,
+			       mbhc_cfg.gpio, err);
+		}
+		gpio_direction_input(mbhc_cfg.gpio);
 	}
-
+#if 0
 	if (mbhc_cfg.gpio) {
 		err = pm8xxx_gpio_config(mbhc_cfg.gpio, &jack_gpio_cfg);
 		if (err) {
@@ -944,11 +1007,27 @@ static int msm8960_audrx_init(struct snd_soc_pcm_runtime *rtd)
 			return err;
 		}
 	}
+#endif
+	err = gpio_request(TABLA_HS_SW_GPIO, "HEADSET_SW");
+	if (err < 0) {
+		pr_err("%s: gpio_request %d failed %d\n", __func__,
+		       TABLA_HS_SW_GPIO, err);
+		goto fail;
+	}
+
+	gpio_tlmm_config( HS_SW_GPIO_CFG, GPIO_CFG_ENABLE );
 
 	mbhc_cfg.read_fw_bin = hs_detect_use_firmware;
-
+#if 0
 	err = tabla_hs_detect(codec, &mbhc_cfg);
+#else
+	err = tabla_kc_hs_detect(codec, &mbhc_cfg);
+#endif
 
+	return err;
+
+fail:
+	gpio_free(mbhc_cfg.gpio);
 	return err;
 }
 
@@ -996,6 +1075,7 @@ static int msm8960_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
+#if 0
 static int msm8960_hdmi_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 					struct snd_pcm_hw_params *params)
 {
@@ -1012,6 +1092,7 @@ static int msm8960_hdmi_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 
 	return 0;
 }
+#endif
 
 static int msm8960_btsco_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 					struct snd_pcm_hw_params *params)
@@ -1396,6 +1477,7 @@ static struct snd_soc_dai_link msm8960_dai_common[] = {
 		.be_hw_params_fixup = msm8960_be_hw_params_fixup,
 	},
 	/* HDMI BACK END DAI Link */
+#if 0
 	{
 		.name = LPASS_BE_HDMI,
 		.stream_name = "HDMI Playback",
@@ -1408,6 +1490,7 @@ static struct snd_soc_dai_link msm8960_dai_common[] = {
 		.be_hw_params_fixup = msm8960_hdmi_be_hw_params_fixup,
 		.ignore_pmdown_time = 1, /* this dainlink has playback support */
 	},
+#endif
 	/* Backend AFE DAI Links */
 	{
 		.name = LPASS_BE_AFE_PCM_RX,
@@ -1635,6 +1718,7 @@ static struct platform_device *msm8960_snd_tabla1x_device;
 
 static int msm8960_configure_headset_mic_gpios(void)
 {
+#if 0
 	int ret;
 	struct pm_gpio param = {
 		.direction      = PM_GPIO_DIR_OUT,
@@ -1675,6 +1759,9 @@ static int msm8960_configure_headset_mic_gpios(void)
 		gpio_direction_output(us_euro_sel_gpio, 0);
 
 	return 0;
+#else
+	return (-1);
+#endif
 }
 static void msm8960_free_headset_mic_gpios(void)
 {
@@ -1760,6 +1847,8 @@ static void __exit msm8960_audio_exit(void)
 	msm8960_free_headset_mic_gpios();
 	platform_device_unregister(msm8960_snd_device);
 	platform_device_unregister(msm8960_snd_tabla1x_device);
+	gpio_free(mbhc_cfg.gpio);
+	gpio_free(TABLA_HS_SW_GPIO);
 	kfree(mbhc_cfg.calibration);
 	mutex_destroy(&cdc_mclk_mutex);
 }

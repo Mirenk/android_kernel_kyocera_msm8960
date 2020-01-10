@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
@@ -38,6 +42,10 @@ static int crash_shutdown;
 #define MAX_SSR_REASON_LEN 81U
 #define Q6_FW_WDOG_ENABLE		0x08882024
 #define Q6_SW_WDOG_ENABLE		0x08982024
+
+extern void set_smem_crash_system_modem(void);
+extern void set_smem_crash_kind_wdog_hw(void);
+extern void set_smem_crash_info_data( const char *pdata );
 
 static void log_modem_sfr(void)
 {
@@ -81,6 +89,19 @@ static void modem_wdog_check(struct work_struct *work)
 	regval = readl_relaxed(q6_sw_wdog_addr);
 	if (!regval) {
 		pr_err("modem-8960: Modem watchdog wasn't activated!. Restarting the modem now.\n");
+		set_smem_crash_system_modem();
+		set_smem_crash_kind_wdog_hw();
+		{
+			char buf[33];
+			memset( buf, '\0', sizeof(buf) );
+			snprintf( buf,
+			          sizeof(buf),
+			          "%x,%s",
+			          __LINE__,
+			          __func__
+			);
+			set_smem_crash_info_data( (const char *)buf );
+		}
 		restart_modem();
 	}
 
@@ -219,10 +240,36 @@ static irqreturn_t modem_wdog_bite_irq(int irq, void *dev_id)
 
 	case Q6SW_WDOG_EXPIRED_IRQ:
 		pr_err("Watchdog bite received from modem software!\n");
+		set_smem_crash_system_modem();
+		set_smem_crash_kind_wdog_hw();
+		{
+			char buf[33];
+			memset( buf, '\0', sizeof(buf) );
+			snprintf( buf,
+			          sizeof(buf),
+			          "%x,%s",
+			          __LINE__,
+			          __func__
+			);
+			set_smem_crash_info_data( (const char *)buf );
+		}
 		restart_modem();
 		break;
 	case Q6FW_WDOG_EXPIRED_IRQ:
 		pr_err("Watchdog bite received from modem firmware!\n");
+		set_smem_crash_system_modem();
+		set_smem_crash_kind_wdog_hw();
+		{
+			char buf[33];
+			memset( buf, '\0', sizeof(buf) );
+			snprintf( buf,
+			          sizeof(buf),
+			          "%x,%s",
+			          __LINE__,
+			          __func__
+			);
+			set_smem_crash_info_data( (const char *)buf );
+		}
 		restart_modem();
 		break;
 	break;

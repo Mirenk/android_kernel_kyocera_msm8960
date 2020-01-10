@@ -10,6 +10,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -219,6 +223,7 @@ done:
 unsigned min_slack_ticks = UINT_MAX;
 unsigned long long min_slack_ns = ULLONG_MAX;
 
+extern void extension_ram_log_00(char *client_data);
 void pet_watchdog(void)
 {
 	int slack;
@@ -239,6 +244,7 @@ void pet_watchdog(void)
 	if (slack_ns < min_slack_ns)
 		min_slack_ns = slack_ns;
 	last_pet = time_ns;
+	extension_ram_log_00("pet apps watchdog");
 }
 
 static void pet_watchdog_work(struct work_struct *work)
@@ -249,6 +255,9 @@ static void pet_watchdog_work(struct work_struct *work)
 		schedule_delayed_work_on(0, &dogwork_struct, delay_time);
 }
 
+extern void set_smem_crash_kind_wdog_hw(void);
+extern void set_smem_crash_system_kernel(void);
+extern void set_smem_crash_info_data( const char *pdata );
 static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 {
 	unsigned long nanosec_rem;
@@ -277,6 +286,20 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 		}
 
 		msm_watchdog_resume(NULL);
+	}
+
+	set_smem_crash_system_kernel();
+	set_smem_crash_kind_wdog_hw();
+	{
+		char buf[33];
+		memset( buf, '\0', sizeof(buf) );
+		snprintf( buf,
+		          sizeof(buf),
+		          "%x,%s",
+		          __LINE__,
+		          __func__
+		);
+		set_smem_crash_info_data( (const char *)buf );
 	}
 
 	panic("Apps watchdog bark received!");

@@ -701,6 +701,8 @@ int ion_map_iommu(struct ion_client *client, struct ion_handle *handle,
 
 			if (iommu_map->flags & ION_IOMMU_UNMAP_DELAYED)
 				kref_get(&iommu_map->ref);
+		} else {
+				ret = PTR_ERR(iommu_map);
 		}
 	} else {
 		if (iommu_map->flags != iommu_flags) {
@@ -1451,8 +1453,6 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		end = (unsigned long) data.vaddr + data.length;
 
 		if (check_vaddr_bounds(start, end)) {
-			pr_err("%s: virtual address %p is out of bounds\n",
-				__func__, data.vaddr);
 			return -EINVAL;
 		}
 

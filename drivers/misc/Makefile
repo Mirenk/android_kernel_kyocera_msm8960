@@ -1,6 +1,10 @@
 #
 # Makefile for misc devices that really don't fit anywhere else.
 #
+#
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2012 KYOCERA Corporation
+#
 
 obj-$(CONFIG_IBM_ASM)		+= ibmasm/
 obj-$(CONFIG_AD525X_DPOT)	+= ad525x_dpot.o
@@ -64,6 +68,10 @@ obj-$(CONFIG_TSPP) += tspp.o
 obj-$(CONFIG_HAPTIC_ISA1200)		+= isa1200.o
 obj-$(CONFIG_PMIC8058_PWM) += pmic8058-pwm.o
 obj-$(CONFIG_PMIC8XXX_VIBRATOR) += pm8xxx-vibrator.o
+CFLAGS_pm8xxx-vibrator.o += -Idrivers/staging/android
+obj-$(CONFIG_LC898300_VIBRATOR) += lc898300-vibrator.o
+CFLAGS_lc898300-vibrator.o += -Idrivers/staging/android
+CFLAGS_lc898300-vibrator.o += -Iarch/arm/mach-msm/
 obj-$(CONFIG_PMIC8XXX_NFC) += pm8xxx-nfc.o
 obj-$(CONFIG_PMIC8XXX_UPL) += pm8xxx-upl.o
 obj-$(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_DEEP_POWER_DOWN) \
@@ -71,3 +79,4 @@ obj-$(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_DEEP_POWER_DOWN) \
 obj-$(CONFIG_PMIC8058_XOADC) += pmic8058-xoadc.o
 obj-$(CONFIG_QSEECOM) += qseecom.o
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
+obj-$(CONFIG_DTVTUNER_PM) += dtvtuner_pm.o

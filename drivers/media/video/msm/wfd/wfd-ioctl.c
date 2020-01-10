@@ -10,6 +10,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -875,6 +879,7 @@ static int wfd_register_out_buf(struct wfd_inst *inst,
 					sizeof(struct mem_info))) {
 			WFD_MSG_ERR(" copy_from_user failed. Populate"
 					" v4l2_buffer->reserved with meminfo\n");
+			kfree(minfo_entry);
 			return -EINVAL;
 		}
 		minfo_entry->userptr = b->m.userptr;

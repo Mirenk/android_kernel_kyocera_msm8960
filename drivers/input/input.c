@@ -1,4 +1,9 @@
 /*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * (C) 2013 KYOCERA Corporation
+ */
+/*
  * The input core
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
@@ -602,6 +607,28 @@ static void input_dev_release_keys(struct input_dev *dev)
 	}
 }
 
+/*
+ * Only for resume
+ * Simulate keyup events for all keys that are marked as pressed.
+ * The function must be called with dev->event_lock held.
+ */
+static void input_dev_release_keys_for_resume(struct input_dev *dev)
+{
+	int code;
+
+	if (is_event_supported(EV_KEY, dev->evbit, EV_MAX)) {
+		for (code = 0; code <= KEY_MAX; code++) {
+			if (is_event_supported(code, dev->keybit, KEY_MAX)) {
+				if(code != KEY_VOLUMEUP){
+					if(__test_and_clear_bit(code, dev->key)){
+						input_pass_event(dev, EV_KEY, code, 0);
+					}
+				}
+			}
+		}
+		input_pass_event(dev, EV_SYN, SYN_REPORT, 1);
+	}
+}
 /*
  * Prepare device for unregistering
  */
@@ -1582,7 +1609,33 @@ void input_reset_device(struct input_dev *dev)
 	mutex_unlock(&dev->mutex);
 }
 EXPORT_SYMBOL(input_reset_device);
+/**
+ * input_reset_device_for_resume() - reset/restore the state of input device
+ * @dev: input device whose state needs to be reset
+ *
+ * Only for resume.
+ * This function tries to reset the state of an opened input device and
+ * bring internal state and state if the hardware in sync with each other.
+ * We mark all keys as released, restore LED state, repeat rate, etc.
+ */
+static void input_reset_device_for_resume(struct input_dev *dev)
+{
+	mutex_lock(&dev->mutex);
 
+	if (dev->users) {
+		input_dev_toggle(dev, true);
+
+		/*
+		 * Keys that have been pressed at suspend time are unlikely
+		 * to be still pressed when we resume.
+		 */
+		spin_lock_irq(&dev->event_lock);
+		input_dev_release_keys_for_resume(dev);
+		spin_unlock_irq(&dev->event_lock);
+	}
+
+	mutex_unlock(&dev->mutex);
+}
 #ifdef CONFIG_PM
 static int input_dev_suspend(struct device *dev)
 {
@@ -1602,7 +1655,7 @@ static int input_dev_resume(struct device *dev)
 {
 	struct input_dev *input_dev = to_input_dev(dev);
 
-	input_reset_device(input_dev);
+	input_reset_device_for_resume(input_dev);
 
 	return 0;
 }

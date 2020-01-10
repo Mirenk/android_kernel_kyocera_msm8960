@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/delay.h>
 #include <linux/clk.h>
@@ -167,7 +171,7 @@ static struct msm_cam_clk_info csid_clk_info[] = {
 };
 
 static struct camera_vreg_t csid_vreg_info[] = {
-	{"mipi_csi_vdd", REG_LDO, 1200000, 1200000, 20000},
+	{"mipi_csi_vdd", REG_LDO, 1200000, 1200000, 40000, 100},
 };
 
 static int msm_csid_init(struct v4l2_subdev *sd, uint32_t *csid_version)

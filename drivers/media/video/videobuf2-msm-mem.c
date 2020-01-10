@@ -16,6 +16,10 @@
  * The functions support contiguous memory allocations using pmem
  * kernel API.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -341,6 +345,11 @@ unsigned long videobuf2_to_pmem_contig(struct vb2_buffer *vb,
 {
 	struct videobuf2_contig_pmem *mem;
 	mem = vb2_plane_cookie(vb, plane_no);
+	if((unsigned int)mem <= 0x10)
+	{
+		pr_err("%s vb2_plane_cookie ret=NULL \n",__func__);
+		return 0;
+	}
 	BUG_ON(!mem);
 	MAGIC_CHECK(mem->magic, MAGIC_PMEM);
 	return mem->mapped_phyaddr;

@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -1084,6 +1088,7 @@ static const struct slim_device_id slimtest_id[] = {
 	{}
 };
 
+#if 0
 static struct slim_driver tabla_slim_driver = {
 	.driver = {
 		.name = "tabla-slim",
@@ -1095,6 +1100,7 @@ static struct slim_driver tabla_slim_driver = {
 	.resume = wcd9xxx_slim_resume,
 	.suspend = wcd9xxx_slim_suspend,
 };
+#endif
 
 static const struct slim_device_id slimtest2x_id[] = {
 	{"tabla2x-slim", 0},
@@ -1163,11 +1169,13 @@ static struct i2c_driver sitar_i2c_driver = {
 static int __init wcd9xxx_init(void)
 {
 	int ret1, ret2, ret3, ret4, ret5, ret6;
-
+#if 0
 	ret1 = slim_driver_register(&tabla_slim_driver);
 	if (ret1 != 0)
 		pr_err("Failed to register tabla SB driver: %d\n", ret1);
-
+#else
+    ret1 = 0;
+#endif
 	ret2 = slim_driver_register(&tabla2x_slim_driver);
 	if (ret2 != 0)
 		pr_err("Failed to register tabla2x SB driver: %d\n", ret2);

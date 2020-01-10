@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/delay.h>
 #include <linux/clk.h>
@@ -212,7 +216,7 @@ int msm_camera_config_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 				if (curr_vreg->type == REG_LDO) {
 					if (curr_vreg->op_mode >= 0) {
 						regulator_set_optimum_mode(
-							reg_ptr[i], 0);
+							reg_ptr[i], curr_vreg->lp_mode);
 					}
 					regulator_set_voltage(
 						reg_ptr[i], 0, curr_vreg->

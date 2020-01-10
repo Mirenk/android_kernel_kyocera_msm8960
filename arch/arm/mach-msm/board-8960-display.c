@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -27,6 +31,10 @@
 
 #include "devices.h"
 #include "board-8960.h"
+
+#ifndef CONFIG_FB_MSM_MIPI_RENESAS_CMD_WVGA
+#define NOVATEC_CMDPANEL
+#endif
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_PRIM_BUF_SIZE \
@@ -67,6 +75,10 @@
 #define MIPI_CMD_RENESAS_FWVGA_PANEL_NAME	"mipi_cmd_renesas_fwvga"
 #define MIPI_VIDEO_ORISE_720P_PANEL_NAME	"mipi_video_orise_720p"
 #define MIPI_CMD_ORISE_720P_PANEL_NAME		"mipi_cmd_orise_720p"
+#define MIPI_CMD_NOVATEK_WXGA_PANEL_NAME	"mipi_cmd_novatek_wxga"
+#ifdef CONFIG_FB_MSM_MIPI_RENESAS_CMD_WVGA
+#define MIPI_CMD_RENESAS_WVGA_PANEL_NAME	"mipi_cmd_renesas_wvga"
+#endif
 #define HDMI_PANEL_NAME	"hdmi_msm"
 #define TVOUT_PANEL_NAME	"tvout_msm"
 
@@ -107,10 +119,19 @@ static int msm_fb_detect_panel(const char *name)
 				return 0;
 		}
 	} else {
+#ifdef CONFIG_FB_MSM_MIPI_RENESAS_CMD_WVGA
+		if (!strncmp(name, MIPI_CMD_RENESAS_WVGA_PANEL_NAME,
+				strnlen(MIPI_CMD_RENESAS_WVGA_PANEL_NAME,
+					PANEL_NAME_MAX_LEN)))
+			return 0;
+#else
+#ifndef NOVATEC_CMDPANEL
 		if (!strncmp(name, MIPI_VIDEO_TOSHIBA_WSVGA_PANEL_NAME,
 				strnlen(MIPI_VIDEO_TOSHIBA_WSVGA_PANEL_NAME,
 					PANEL_NAME_MAX_LEN)))
 			return 0;
+#endif /* NOVATEC_CMDPANEL */
+#endif
 
 #if !defined(CONFIG_FB_MSM_LVDS_MIPI_PANEL_DETECT) && \
 	!defined(CONFIG_FB_MSM_MIPI_PANEL_DETECT)
@@ -151,6 +172,13 @@ static int msm_fb_detect_panel(const char *name)
 					PANEL_NAME_MAX_LEN)))
 			return 0;
 #endif
+#ifdef NOVATEC_CMDPANEL
+		if (!strncmp(name, MIPI_CMD_NOVATEK_WXGA_PANEL_NAME,
+				strnlen(MIPI_CMD_NOVATEK_WXGA_PANEL_NAME,
+					PANEL_NAME_MAX_LEN))) {
+			return 0;
+	}
+#endif /* NOVATEC_CMDPANEL */
 	}
 
 	if (!strncmp(name, HDMI_PANEL_NAME,
@@ -226,7 +254,8 @@ static void mipi_dsi_panel_pwm_cfg(void)
 	}
 }
 
-static bool dsi_power_on;
+/* static bool dsi_power_on; */
+static bool dsi_power_on = false;
 
 /**
  * LiQUID panel on/off
@@ -348,13 +377,19 @@ static int mipi_dsi_liquid_panel_power(int on)
 
 static int mipi_dsi_cdp_panel_power(int on)
 {
+#ifndef CONFIG_FB_MSM_MIPI_RENESAS_CMD_WVGA
+#ifndef NOVATEC_CMDPANEL
 	static struct regulator *reg_l8, *reg_l23, *reg_l2;
 	static int gpio43;
+#else  /* NOVATEC_CMDPANEL */
+	static int gpio48;
+#endif /* NOVATEC_CMDPANEL */
 	int rc;
 
 	pr_debug("%s: state : %d\n", __func__, on);
 
 	if (!dsi_power_on) {
+#ifndef NOVATEC_CMDPANEL
 
 		reg_l8 = regulator_get(&msm_mipi_dsi1_device.dev,
 				"dsi_vdc");
@@ -398,8 +433,18 @@ static int mipi_dsi_cdp_panel_power(int on)
 			pr_err("request gpio 43 failed, rc=%d\n", rc);
 			return -ENODEV;
 		}
+#else  /* NOVATEC_CMDPANEL */
+		gpio48 = PM8921_GPIO_PM_TO_SYS(48);
+		rc = gpio_request(gpio48, "disp_rst_n");
+		if (rc) {
+			printk(KERN_ERR "request gpio 48 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		gpio_set_value_cansleep(gpio48, 0);
+#endif /* NOVATEC_CMDPANEL */
 		dsi_power_on = true;
 	}
+#ifndef NOVATEC_CMDPANEL
 	if (on) {
 		rc = regulator_set_optimum_mode(reg_l8, 100000);
 		if (rc < 0) {
@@ -465,6 +510,10 @@ static int mipi_dsi_cdp_panel_power(int on)
 		}
 		gpio_set_value_cansleep(gpio43, 0);
 	}
+#endif /* NOVATEC_CMDPANEL */
+#else
+	/* CONFIG_FB_MSM_MIPI_RENESAS_CMD_WVGA */
+#endif
 	return 0;
 }
 
@@ -585,7 +634,7 @@ static struct msm_panel_common_pdata mdp_pdata = {
 #else
 	.mem_hid = MEMTYPE_EBI1,
 #endif
-	.cont_splash_enabled = 0x01,
+	.cont_splash_enabled = 0x00,
 	.mdp_iommu_split_domain = 0,
 };
 
@@ -610,6 +659,14 @@ static struct platform_device mipi_dsi_renesas_panel_device = {
 	.name = "mipi_renesas",
 	.id = 0,
 };
+
+#ifdef CONFIG_FB_MSM_MIPI_RENESAS_CMD_WVGA
+static struct platform_device mipi_dsi_renesas_cm_panel_device = {
+	.name = "mipi_renesas_cm",
+	.id = 0,
+	.dev.platform_data = (void *)&mipi_dsi_pdata,
+};
+#endif
 
 static struct platform_device mipi_dsi_simulator_panel_device = {
 	.name = "mipi_simulator",
@@ -780,9 +837,14 @@ static struct msm_bus_scale_pdata dtv_bus_scale_pdata = {
 
 static struct lcdc_platform_data dtv_pdata = {
 	.bus_scale_table = &dtv_bus_scale_pdata,
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 	.lcdc_power_save = hdmi_panel_power,
+#else /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
+	.lcdc_power_save = NULL,
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 };
 
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 static int hdmi_panel_power(int on)
 {
 	int rc;
@@ -795,11 +857,13 @@ static int hdmi_panel_power(int on)
 	pr_debug("%s: HDMI Core: %s Success\n", __func__, (on ? "ON" : "OFF"));
 	return rc;
 }
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 #endif
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 static int hdmi_enable_5v(int on)
 {
+#if 0
 	/* TBD: PM8921 regulator instead of 8901 */
 	static struct regulator *reg_8921_hdmi_mvs;	/* HDMI_5V */
 	static int prev_on;
@@ -836,7 +900,7 @@ static int hdmi_enable_5v(int on)
 	}
 
 	prev_on = on;
-
+#endif /* #if 0 */
 	return 0;
 }
 
@@ -1001,6 +1065,10 @@ void __init msm8960_init_fb(void)
 #ifdef CONFIG_FB_MSM_WRITEBACK_MSM_PANEL
 	platform_device_register(&wfd_panel_device);
 	platform_device_register(&wfd_device);
+#endif
+
+#ifdef CONFIG_FB_MSM_MIPI_RENESAS_CMD_WVGA
+		platform_device_register(&mipi_dsi_renesas_cm_panel_device);
 #endif
 
 	if (machine_is_msm8960_sim())

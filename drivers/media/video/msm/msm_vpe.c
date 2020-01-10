@@ -10,6 +10,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/module.h>
 #include <linux/uaccess.h>
@@ -452,6 +456,11 @@ static void vpe_send_outmsg(void)
 		spin_unlock_irqrestore(&vpe_ctrl->lock, flags);
 		return;
 	}
+	if( vpe_ctrl->pp_frame_info == NULL){
+		spin_unlock_irqrestore(&vpe_ctrl->lock, flags);
+		return;
+	}
+
 	rp.type = vpe_ctrl->pp_frame_info->pp_frame_cmd.path;
 	rp.extdata = (void *)vpe_ctrl->pp_frame_info;
 	rp.extlen = sizeof(*vpe_ctrl->pp_frame_info);
@@ -538,6 +547,7 @@ int vpe_disable(void)
 	int rc = 0;
 	unsigned long flags = 0;
 	CDBG("%s", __func__);
+	vpe_send_outmsg();
 	spin_lock_irqsave(&vpe_ctrl->lock, flags);
 	if (vpe_ctrl->state == VPE_STATE_IDLE) {
 		CDBG("%s: VPE already disabled", __func__);

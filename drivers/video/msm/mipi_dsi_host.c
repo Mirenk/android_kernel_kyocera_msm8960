@@ -1,4 +1,7 @@
-
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -38,6 +41,7 @@
 #include "mipi_dsi.h"
 #include "mdp.h"
 #include "mdp4.h"
+#include "disp_ext.h"
 
 static struct completion dsi_dma_comp;
 static struct completion dsi_mdp_comp;
@@ -1140,6 +1144,12 @@ int mipi_dsi_cmds_tx(struct dsi_buf *tp, struct dsi_cmd_desc *cmds, int cnt)
 	uint32 dsi_ctrl, ctrl;
 	int i, video_mode;
 
+#ifdef CONFIG_DISP_EXT_BOARD
+	if(disp_ext_board_get_panel_detect() == -1) {
+		return 1;
+	}
+#endif /* CONFIG_DISP_EXT_BOARD */
+
 	/* turn on cmd mode
 	* for video mode, do not send cmds more than
 	* one pixel line, since it only transmit it
@@ -1196,6 +1206,12 @@ int mipi_dsi_cmds_rx(struct msm_fb_data_type *mfd,
 {
 	int cnt, len, diff, pkt_size;
 	char cmd;
+
+#ifdef CONFIG_DISP_EXT_BOARD
+	if(disp_ext_board_get_panel_detect() == -1) {
+		return 1;
+	}
+#endif /* CONFIG_DISP_EXT_BOARD */
 
 	if (mfd->panel_info.mipi.no_max_pkt_size) {
 		/* Only support rlen = 4*n */
@@ -1417,6 +1433,7 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 {
 
 	unsigned long flags;
+	int wait_ret;
 
 #ifdef DSI_HOST_DEBUG
 	int i;
@@ -1453,7 +1470,13 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 	wmb();
 	spin_unlock_irqrestore(&dsi_mdp_lock, flags);
 
-	wait_for_completion(&dsi_dma_comp);
+	wait_ret = wait_for_completion_timeout(&dsi_dma_comp, 5 * HZ);
+	if (wait_ret < 0) {
+		pr_err("%s: failed to wait for completion!\n", __func__);
+	}
+	else if (!wait_ret) {
+		pr_err("%s: Timed out waiting!\n", __func__);
+	}
 
 	dma_unmap_single(&dsi_dev, tp->dmap, tp->len, DMA_TO_DEVICE);
 	tp->dmap = 0;
@@ -1676,6 +1699,13 @@ void mipi_dsi_ack_err_status(void)
 
 	if (status) {
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0064, status);
+#ifdef CONFIG_DISP_EXT_DIAG
+#ifdef CONFIG_DISP_EXT_UTIL
+		if (status & BIT(20)) {
+			disp_ext_util_crc_countup();
+		}
+#endif /* CONFIG_DISP_EXT_UTIL */
+#endif /* CONFIG_DISP_EXT_DIAG */
 		pr_debug("%s: status=%x\n", __func__, status);
 	}
 }
@@ -1764,9 +1794,9 @@ irqreturn_t mipi_dsi_isr(int irq, void *ptr)
 	if (isr & DSI_INTR_CMD_DMA_DONE) {
 		mipi_dsi_mdp_stat_inc(STAT_DSI_CMD);
 		spin_lock(&dsi_mdp_lock);
-		complete(&dsi_dma_comp);
 		dsi_ctrl_lock = FALSE;
 		mipi_dsi_disable_irq_nosync(DSI_CMD_TERM);
+		complete(&dsi_dma_comp);
 		spin_unlock(&dsi_mdp_lock);
 	}
 

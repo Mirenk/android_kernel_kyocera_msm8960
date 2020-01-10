@@ -12,6 +12,10 @@
  *
  * Qualcomm's PM8921/PM8018 ADC Arbiter driver
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
 #include <linux/kernel.h>
@@ -168,10 +172,12 @@ static struct regulator *pa_therm;
 
 static struct pm8xxx_adc_scale_fn adc_scale_fn[] = {
 	[ADC_SCALE_DEFAULT] = {pm8xxx_adc_scale_default},
+	[ADC_SCALE_DEFAULT_VBAT] = {pm8xxx_adc_scale_default_vbat},
 	[ADC_SCALE_BATT_THERM] = {pm8xxx_adc_scale_batt_therm},
 	[ADC_SCALE_PA_THERM] = {pm8xxx_adc_scale_pa_therm},
 	[ADC_SCALE_PMIC_THERM] = {pm8xxx_adc_scale_pmic_therm},
 	[ADC_SCALE_XOTHERM] = {pm8xxx_adc_tdkntcg_therm},
+	[ADC_SCALE_CAMERA_THERM] = {pm8xxx_adc_scale_camera_therm},
 };
 
 /* On PM8921 ADC the MPP needs to first be configured
@@ -293,15 +299,29 @@ static int32_t pm8xxx_adc_patherm_power(bool on)
 	return rc;
 }
 
+extern void oem_hkadc_vrefbat_on(void);
+extern void oem_hkadc_vrefbat_off(void);
 static int32_t pm8xxx_adc_channel_power_enable(uint32_t channel,
 							bool power_cntrl)
 {
 	int rc = 0;
 
-	switch (channel)
+	switch (channel){
 	case ADC_MPP_1_AMUX8:
 		rc = pm8xxx_adc_patherm_power(power_cntrl);
+		break;
 
+	case CHANNEL_BATT_THERM:
+		if (power_cntrl){
+			pr_debug("VREF_BATT enable\n");
+			oem_hkadc_vrefbat_on();
+		}else{
+			pr_debug("VREF_BATT disable\n");
+			oem_hkadc_vrefbat_off();
+		}
+		break;
+
+	}
 	return rc;
 }
 

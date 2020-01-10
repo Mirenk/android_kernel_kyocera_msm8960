@@ -10,6 +10,12 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*********************************************************************
+ * 
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * 
+ *********************************************************************/
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -2721,3 +2727,22 @@ subsys_initcall(mmc_init);
 module_exit(mmc_exit);
 
 MODULE_LICENSE("GPL");
+
+void sdhub_poweron(struct mmc_host *host)
+{
+    mmc_power_up(host);
+
+    sdio_reset(host);
+    mmc_go_idle(host);
+
+    return;
+}
+EXPORT_SYMBOL_GPL(sdhub_poweron);
+
+void sdhub_poweroff(struct mmc_host *host)
+{
+    mmc_stop_host(host);
+
+    return;
+}
+EXPORT_SYMBOL_GPL(sdhub_poweroff);

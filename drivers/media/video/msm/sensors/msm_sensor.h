@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #ifndef MSM_SENSOR_H
 #define MSM_SENSOR_H
@@ -119,6 +123,11 @@ struct msm_sensor_fn_t {
 			struct fps_cfg *);
 	int32_t (*sensor_write_exp_gain) (struct msm_sensor_ctrl_t *,
 			uint16_t, uint32_t);
+	int32_t (*sensor_set_exposure_compensation) (struct msm_sensor_ctrl_t *, int8_t);
+	int32_t (*sensor_set_white_balance) (struct msm_sensor_ctrl_t *, int8_t);
+	int32_t (*sensor_set_vfe_msg_out) (struct msm_sensor_ctrl_t *);
+
+	void (*sensor_get_frame_skip_flg) (struct msm_sensor_ctrl_t *, uint8_t *);
 	int32_t (*sensor_write_snapshot_exp_gain) (struct msm_sensor_ctrl_t *,
 			uint16_t, uint32_t);
 	int32_t (*sensor_setting) (struct msm_sensor_ctrl_t *,
@@ -140,6 +149,9 @@ struct msm_sensor_fn_t {
 		(struct msm_sensor_ctrl_t *s_ctrl, uint16_t res);
 	int32_t (*sensor_get_csi_params)(struct msm_sensor_ctrl_t *,
 		struct csi_lane_params_t *);
+	int32_t (*sensor_get_exposure_time) (struct msm_sensor_ctrl_t *, uint32_t *);
+	int32_t (*sensor_set_note_takepic) (struct msm_sensor_ctrl_t *);
+	int32_t (*sensor_get_is_flash) (struct msm_sensor_ctrl_t *, uint8_t *);
 };
 
 struct msm_sensor_csi_info {
@@ -245,6 +257,12 @@ int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 
 int32_t msm_sensor_setting1(struct msm_sensor_ctrl_t *s_ctrl,
 			int update_type, int res);
+
+int32_t msm_sensor_vfe_msg_out(struct msm_sensor_ctrl_t *s_ctrl);
+
+void msm_sensor_get_frame_skip_flg(struct msm_sensor_ctrl_t *s_ctrl, uint8_t *flag);
+
+int32_t msm_sensor_evt_notify(struct msm_sensor_ctrl_t *s_ctrl, uint8_t msg_id);
 
 int msm_sensor_enable_debugfs(struct msm_sensor_ctrl_t *s_ctrl);
 

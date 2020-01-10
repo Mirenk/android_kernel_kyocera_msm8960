@@ -10,6 +10,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2013 KYOCERA Corporation
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -426,7 +430,7 @@ module_param_named(boost, enable_boost, bool, S_IRUGO | S_IWUSR);
 
 static int calculate_vdd_core(const struct acpu_level *tgt)
 {
-	return tgt->vdd_core + (enable_boost ? drv.boost_uv : 0);
+	return tgt->vdd_core + drv.boost_uv;
 }
 
 /* Set the CPU's clock rate and adjust the L2 rate, voltage and BW requests. */
@@ -929,7 +933,7 @@ static void krait_apply_vmin(struct acpu_level *tbl)
 static int __init select_freq_plan(u32 qfprom_phys)
 {
 	void __iomem *qfprom_base;
-	u32 pte_efuse, pvs, tbl_idx;
+	u32 pte_efuse, pvs, tbl_idx, fake_tbl_idx = PVS_SLOW;
 	char *pvs_names[] = { "Slow", "Nominal", "Fast", "Faster", "Unknown" };
 
 	qfprom_base = ioremap(qfprom_phys, SZ_256);
@@ -964,14 +968,22 @@ static int __init select_freq_plan(u32 qfprom_phys)
 		dev_err(drv.dev, "Unable to map QFPROM base\n");
 	}
 	if (tbl_idx == PVS_UNKNOWN) {
-		tbl_idx = PVS_SLOW;
 		dev_warn(drv.dev, "ACPU PVS: Defaulting to %s\n",
-			 pvs_names[tbl_idx]);
+			 pvs_names[fake_tbl_idx]);
 	} else {
-		dev_info(drv.dev, "ACPU PVS: %s\n", pvs_names[tbl_idx]);
+		if(tbl_idx != fake_tbl_idx){
+			dev_info(drv.dev, "ACPU PVS: Force %s(Org %s)\n", pvs_names[fake_tbl_idx], pvs_names[tbl_idx]);
+		}else{
+			dev_info(drv.dev, "ACPU PVS: %s\n", pvs_names[tbl_idx]);
+		}
+	}
+	if(krait_needs_vmin()){
+		dev_info(drv.dev, "cpuid: 0x%08x krait_needs_vmin() is enabled.\n",read_cpuid_id());
+	}else{
+		dev_info(drv.dev, "cpuid: 0x%08x krait_needs_vmin() is disabled.\n",read_cpuid_id());		
 	}
 
-	return tbl_idx;
+	return fake_tbl_idx;
 }
 
 static void __init drv_data_init(struct device *dev,

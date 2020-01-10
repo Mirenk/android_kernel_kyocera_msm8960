@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/module.h>
 #include <linux/uaccess.h>
@@ -18,6 +22,7 @@
 #include <linux/atomic.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
+#include <linux/workqueue.h>
 #include <mach/irqs.h>
 #include <mach/camera.h>
 #include <media/v4l2-device.h>
@@ -28,6 +33,8 @@
 #include "msm_vfe32.h"
 
 atomic_t irq_cnt;
+
+struct vfe_frame_skip_flag vfe32_skip_frame_flg = {0, 0, 0, 0};
 
 #define VFE32_AXI_OFFSET 0x0050
 #define vfe32_get_ch_ping_addr(chn) \
@@ -58,6 +65,12 @@ struct vfe32_isr_queue_cmd {
 	uint32_t                           vfeInterruptStatus0;
 	uint32_t                           vfeInterruptStatus1;
 };
+
+static struct workqueue_struct *frame_wq;
+struct work_struct cam_work;
+static int stream_condition;
+static int stream_exe;
+DECLARE_WAIT_QUEUE_HEAD( wait_q );
 
 static struct vfe32_cmd_type vfe32_cmd[] = {
 /* 0*/	{VFE_CMD_DUMMY_0},
@@ -559,6 +572,12 @@ static void vfe32_reset_internal_variables(void)
 	vfe32_ctrl->frame_skip_cnt = 31;
 	vfe32_ctrl->frame_skip_pattern = 0xffffffff;
 	vfe32_ctrl->snapshot_frame_cnt = 0;
+
+	vfe32_skip_frame_flg.frame_skip_irq0 = 0;
+	vfe32_skip_frame_flg.frame_skip_irq1 = 0;
+	vfe32_skip_frame_flg.frame_skip_rdi0 = 0;
+	vfe32_skip_frame_flg.frame_skip_rdi1 = 0;
+
 }
 
 static void vfe32_reset(void)
@@ -1387,6 +1406,8 @@ static int vfe32_proc_general(
 			goto proc_general_done;
 		}
 		rc = vfe32_start(pmctl);
+	    stream_exe = 1;
+        queue_work(frame_wq, &cam_work);
 		break;
 	case VFE_CMD_UPDATE:
 		vfe32_update();
@@ -2282,6 +2303,9 @@ static int vfe32_proc_general(
 	case VFE_CMD_STOP:
 		pr_info("vfe32_proc_general: cmdID = %s\n",
 			vfe32_general_cmd[cmd->id]);
+        stream_exe = 0;
+        stream_condition = 1;
+        wake_up_interruptible(&wait_q);
 		vfe32_stop();
 		break;
 
@@ -3098,8 +3122,15 @@ static void vfe32_process_output_path_irq_0(void)
 	uint8_t out_bool = 0;
 	struct msm_free_buf *free_buf = NULL;
 
-	free_buf = vfe32_check_free_buffer(VFE_MSG_OUTPUT_IRQ,
-		VFE_MSG_OUTPUT_PRIMARY);
+	if ( vfe32_skip_frame_flg.frame_skip_irq0 ) {
+		CDBG("%s: skip_frame\n", __func__);
+		free_buf = 0;
+		vfe32_skip_frame_flg.frame_skip_irq0 = 0;
+	}
+	else {
+		free_buf = vfe32_check_free_buffer(VFE_MSG_OUTPUT_IRQ,
+			VFE_MSG_OUTPUT_PRIMARY);
+	}
 
 	/* we render frames in the following conditions:
 	1. Continuous mode and the free buffer is avaialable.
@@ -3179,8 +3210,16 @@ static void vfe32_process_output_path_irq_1(void)
 	uint8_t out_bool = 0;
 	struct msm_free_buf *free_buf = NULL;
 
-	free_buf = vfe32_check_free_buffer(VFE_MSG_OUTPUT_IRQ,
-		VFE_MSG_OUTPUT_SECONDARY);
+	if ( vfe32_skip_frame_flg.frame_skip_irq1 ) {
+		CDBG("%s: skip_frame\n", __func__);
+		free_buf = 0;
+		vfe32_skip_frame_flg.frame_skip_irq1 = 0;
+	}
+	else {
+		free_buf = vfe32_check_free_buffer(VFE_MSG_OUTPUT_IRQ,
+			VFE_MSG_OUTPUT_SECONDARY);
+	}
+
 	out_bool = ((vfe32_ctrl->operation_mode ==
 				VFE_OUTPUTS_THUMB_AND_MAIN ||
 			vfe32_ctrl->operation_mode ==
@@ -3247,8 +3286,16 @@ static void vfe32_process_output_path_irq_rdi0(void)
 	struct msm_free_buf *free_buf = NULL;
 	/*RDI0*/
 	if (vfe32_ctrl->operation_mode & VFE_OUTPUTS_RDI0) {
-		free_buf = vfe32_check_free_buffer(VFE_MSG_OUTPUT_IRQ,
-			VFE_MSG_OUTPUT_TERTIARY1);
+		if ( vfe32_skip_frame_flg.frame_skip_rdi0 ) {
+			CDBG("%s: skip_frame\n", __func__);
+			free_buf = 0;
+			vfe32_skip_frame_flg.frame_skip_rdi0 = 0;
+		}
+		else {
+			free_buf = vfe32_check_free_buffer(VFE_MSG_OUTPUT_IRQ,
+				VFE_MSG_OUTPUT_TERTIARY1);
+		}
+
 		if (free_buf) {
 			ping_pong = msm_camera_io_r(vfe32_ctrl->vfebase +
 				VFE_BUS_PING_PONG_STATUS);
@@ -3284,8 +3331,16 @@ static void vfe32_process_output_path_irq_rdi1(void)
 	struct msm_free_buf *free_buf = NULL;
 	/*RDI1*/
 	if (vfe32_ctrl->operation_mode & VFE_OUTPUTS_RDI1) {
-		free_buf = vfe32_check_free_buffer(VFE_MSG_OUTPUT_IRQ,
-			VFE_MSG_OUTPUT_TERTIARY2);
+		if ( vfe32_skip_frame_flg.frame_skip_rdi1 ) {
+			CDBG("%s: skip_frame\n", __func__);
+			free_buf = 0;
+			vfe32_skip_frame_flg.frame_skip_rdi1 = 0;
+		}
+		else {
+			free_buf = vfe32_check_free_buffer(VFE_MSG_OUTPUT_IRQ,
+				VFE_MSG_OUTPUT_TERTIARY2);
+		}
+
 		if (free_buf) {
 			ping_pong = msm_camera_io_r(vfe32_ctrl->vfebase +
 				VFE_BUS_PING_PONG_STATUS);
@@ -3931,6 +3986,8 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 	if (cmd->cmd_type == CMD_VFE_PROCESS_IRQ) {
 		vfe32_process_irq((uint32_t) data);
 		return rc;
+	} else if (cmd->cmd_type == CMD_VFE_SET_FRAME_SKIP) {
+		CDBG("%s: CMD_VFE_SET_FRAME_SKIP\n", __func__);
 	} else if (cmd->cmd_type != CMD_CONFIG_PING_ADDR &&
 		cmd->cmd_type != CMD_CONFIG_PONG_ADDR &&
 		cmd->cmd_type != CMD_CONFIG_FREE_BUF_ADDR &&
@@ -4068,6 +4125,25 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 	case CMD_STATS_CS_BUF_RELEASE:
 		vfe32_stats_cs_ack(sack);
 		break;
+
+	case CMD_VFE_SET_FRAME_SKIP:
+		{
+			uint8_t flag;
+
+			CDBG("%s CMD_VFE_SET_FRAME_SKIP \n", __func__);
+
+			flag = *(uint8_t *)cmd->value;
+			vfe32_skip_frame_flg.frame_skip_irq0 |= flag;
+			vfe32_skip_frame_flg.frame_skip_irq1 |= flag;
+			vfe32_skip_frame_flg.frame_skip_rdi0 |= flag;
+			vfe32_skip_frame_flg.frame_skip_rdi1 |= flag;
+			CDBG("%s vfe32_skip_frame_flg.frame_skip_irq0 = %d \n", __func__, vfe32_skip_frame_flg.frame_skip_irq0);
+			CDBG("%s vfe32_skip_frame_flg.frame_skip_irq1 = %d \n", __func__, vfe32_skip_frame_flg.frame_skip_irq1);
+			CDBG("%s vfe32_skip_frame_flg.frame_skip_rdi0 = %d \n", __func__, vfe32_skip_frame_flg.frame_skip_rdi0);
+			CDBG("%s vfe32_skip_frame_flg.frame_skip_rdi1 = %d \n", __func__, vfe32_skip_frame_flg.frame_skip_rdi1);
+		}
+		break;
+
 	default:
 		pr_err("%s Unsupported AXI configuration %x ", __func__,
 			cmd->cmd_type);
@@ -4094,7 +4170,7 @@ static int msm_axi_subdev_s_crystal_freq(struct v4l2_subdev *sd,
 	struct axi_ctrl_t *axi_ctrl = v4l2_get_subdevdata(sd);
 
 	round_rate = clk_round_rate(axi_ctrl->vfe_clk[0], freq);
-	if (rc < 0) {
+	if (round_rate < 0) {
 		pr_err("%s: clk_round_rate failed %d\n",
 					__func__, rc);
 		return rc;
@@ -4221,6 +4297,9 @@ void msm_axi_subdev_release(struct v4l2_subdev *sd)
 	struct axi_ctrl_t *axi_ctrl = v4l2_get_subdevdata(sd);
 	CDBG("%s, free_irq\n", __func__);
 	disable_irq(axi_ctrl->vfeirq->start);
+	stream_exe = 0;
+	stream_condition = 1;
+	wake_up_interruptible(&wait_q);
 	tasklet_kill(&axi_ctrl->vfe32_tasklet);
 	msm_cam_clk_enable(&axi_ctrl->pdev->dev, vfe32_clk_info,
 			axi_ctrl->vfe_clk, ARRAY_SIZE(vfe32_clk_info), 0);
@@ -4435,6 +4514,12 @@ static int msm_axi_config(struct v4l2_subdev *sd, void __user *arg)
 static void msm_axi_process_irq(struct v4l2_subdev *sd, void *arg)
 {
 	uint32_t irqstatus = (uint32_t) arg;
+	
+	if((irqstatus & VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE0_MASK) ||
+	   (irqstatus & VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE1_MASK)) {
+        stream_condition = 1;
+        wake_up_interruptible(&wait_q);
+	}
 	/* next, check output path related interrupts. */
 	if (irqstatus &
 		VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE0_MASK) {
@@ -4510,6 +4595,26 @@ static long msm_axi_subdev_ioctl(struct v4l2_subdev *sd,
 	return rc;
 }
 
+static void msm_frame_monitoring(struct work_struct *work)
+{
+    int rc;
+    struct isp_msg_event isp_msg_evt;
+
+    while (stream_exe) {
+        stream_condition = 0;
+        rc = wait_event_interruptible_timeout(wait_q, stream_condition, msecs_to_jiffies(800));
+        if(!rc && stream_exe){
+            isp_msg_evt.msg_id = MSG_ID_ERROR_TIMEOUT;
+            v4l2_subdev_notify(&vfe32_ctrl->subdev,
+                    NOTIFY_ISP_MSG_EVT,
+                    (void *)&isp_msg_evt);
+            pr_err("%s: camframe timeout!!\n", __func__);
+            return;
+        }
+    }
+    return;
+}
+
 static const struct v4l2_subdev_core_ops msm_axi_subdev_core_ops = {
 	.ioctl = msm_axi_subdev_ioctl,
 };
@@ -4553,6 +4658,12 @@ static int __devinit vfe32_probe(struct platform_device *pdev)
 			 sizeof(vfe32_ctrl->subdev.name), "vfe3.2");
 	v4l2_set_subdevdata(&vfe32_ctrl->subdev, vfe32_ctrl);
 	platform_set_drvdata(pdev, &vfe32_ctrl->subdev);
+
+    frame_wq = create_singlethread_workqueue("frame_wq");
+    if(frame_wq)
+    {
+        INIT_WORK(&cam_work, msm_frame_monitoring);
+    }
 
 	axi_ctrl->vfemem = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "vfe32");

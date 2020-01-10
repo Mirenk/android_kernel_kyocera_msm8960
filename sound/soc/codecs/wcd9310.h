@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -250,4 +254,7 @@ extern void *tabla_mbhc_cal_btn_det_mp(const struct tabla_mbhc_btn_detect_cfg
 	    (cfg_ptr->_n_rload * (sizeof(cfg_ptr->_rload[0]) + \
 				 sizeof(cfg_ptr->_alpha[0]))))
 
+#define TABLA_HS_SW_GPIO 49
 
+extern int tabla_kc_hs_detect(struct snd_soc_codec *codec,
+			   const struct tabla_mbhc_config *cfg);

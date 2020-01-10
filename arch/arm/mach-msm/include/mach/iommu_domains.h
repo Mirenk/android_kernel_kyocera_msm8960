@@ -175,7 +175,7 @@ static inline void msm_iommu_unmap_contig_buffer(unsigned long iova,
 
 static inline int msm_register_domain(struct msm_iova_layout *layout)
 {
-	return -ENODEV;
+	//return -ENODEV;
 }
 #endif
 

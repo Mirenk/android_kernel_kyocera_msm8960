@@ -10,6 +10,11 @@
  * either version 2 of that License or (at your option) any later version.
  */
 
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
+
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
@@ -31,7 +36,7 @@
 
 struct f_gser {
 	struct gserial			port;
-	u8				data_id;
+	u8				ctrl_id,data_id;
 	u8				port_num;
 
 	u8				online;
@@ -99,6 +104,7 @@ static inline struct f_gser *port_to_gser(struct gserial *p)
 
 /* interface descriptor: */
 
+#if 0
 static struct usb_interface_descriptor gser_interface_desc = {
 	.bLength =		USB_DT_INTERFACE_SIZE,
 	.bDescriptorType =	USB_DT_INTERFACE,
@@ -224,7 +230,140 @@ static struct usb_descriptor_header *gser_hs_function[] = {
 	(struct usb_descriptor_header *) &gser_hs_out_desc,
 	NULL,
 };
+#else
+static struct usb_interface_descriptor gser_control_interface_desc = {
+	.bLength =		USB_DT_INTERFACE_SIZE,
+	.bDescriptorType =	USB_DT_INTERFACE,
+	/* .bInterfaceNumber = DYNAMIC */
+	.bNumEndpoints =	1,
+	.bInterfaceClass =	USB_CLASS_COMM,
+	.bInterfaceSubClass =	USB_CDC_SUBCLASS_ACM,
+	.bInterfaceProtocol =	USB_CDC_ACM_PROTO_AT_V25TER,
+	/* .iInterface = DYNAMIC */
+};
 
+static struct usb_interface_descriptor gser_data_interface_desc = {
+	.bLength =		USB_DT_INTERFACE_SIZE,
+	.bDescriptorType =	USB_DT_INTERFACE,
+	/* .bInterfaceNumber = DYNAMIC */
+	.bNumEndpoints =	2,
+	.bInterfaceClass =	USB_CLASS_CDC_DATA,
+	.bInterfaceSubClass =	0,
+	.bInterfaceProtocol =	0,
+	.iInterface = 0,
+};
+
+static struct usb_cdc_header_desc gser_header_desc = {
+	.bLength =		sizeof(gser_header_desc),
+	.bDescriptorType =	USB_DT_CS_INTERFACE,
+	.bDescriptorSubType =	USB_CDC_HEADER_TYPE,
+	.bcdCDC =		cpu_to_le16(0x0110),
+};
+
+static struct usb_cdc_call_mgmt_descriptor
+gser_call_mgmt_descriptor = {
+	.bLength =		sizeof(gser_call_mgmt_descriptor),
+	.bDescriptorType =	USB_DT_CS_INTERFACE,
+	.bDescriptorSubType =	USB_CDC_CALL_MANAGEMENT_TYPE,
+	.bmCapabilities =	USB_CDC_COMM_FEATURE|USB_CDC_CAP_LINE,
+	/* .bDataInterface = DYNAMIC */
+};
+
+static struct usb_cdc_acm_descriptor gser_descriptor = {
+	.bLength =		sizeof(gser_descriptor),
+	.bDescriptorType =	USB_DT_CS_INTERFACE,
+	.bDescriptorSubType =	USB_CDC_ACM_TYPE,
+	.bmCapabilities =	USB_CDC_CAP_LINE,
+};
+
+static struct usb_cdc_union_desc gser_union_desc = {
+	.bLength =		sizeof(gser_union_desc),
+	.bDescriptorType =	USB_DT_CS_INTERFACE,
+	.bDescriptorSubType =	USB_CDC_UNION_TYPE,
+	/* .bMasterInterface0 =	DYNAMIC */
+	/* .bSlaveInterface0 =	DYNAMIC */
+};
+
+/* full speed support: */
+
+static struct usb_endpoint_descriptor gser_fs_notify_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes =		USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize =	0x0040,
+	.bInterval =		0x10,
+};
+
+static struct usb_endpoint_descriptor gser_fs_in_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes =		USB_ENDPOINT_XFER_INT,
+	.bInterval =		0x20,
+};
+
+static struct usb_endpoint_descriptor gser_fs_out_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_OUT,
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.bInterval =		0x20,
+};
+
+static struct usb_descriptor_header *gser_fs_function[] = {
+	(struct usb_descriptor_header *) &gser_control_interface_desc,
+	(struct usb_descriptor_header *) &gser_header_desc,
+	(struct usb_descriptor_header *) &gser_call_mgmt_descriptor,
+	(struct usb_descriptor_header *) &gser_descriptor,
+	(struct usb_descriptor_header *) &gser_union_desc,
+	(struct usb_descriptor_header *) &gser_fs_notify_desc,
+	(struct usb_descriptor_header *) &gser_data_interface_desc,
+	(struct usb_descriptor_header *) &gser_fs_in_desc,
+	(struct usb_descriptor_header *) &gser_fs_out_desc,
+	NULL,
+};
+
+/* high speed support: */
+
+static struct usb_endpoint_descriptor gser_hs_notify_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes =		USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize =	0x0040,
+	.bInterval =		0x10,
+};
+
+static struct usb_endpoint_descriptor gser_hs_in_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize =	cpu_to_le16(512),
+	.bInterval =		0x20,
+};
+
+static struct usb_endpoint_descriptor gser_hs_out_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize =	cpu_to_le16(512),
+	.bInterval =		0x20,
+};
+
+static struct usb_descriptor_header *gser_hs_function[] = {
+	(struct usb_descriptor_header *) &gser_control_interface_desc,
+	(struct usb_descriptor_header *) &gser_header_desc,
+	(struct usb_descriptor_header *) &gser_call_mgmt_descriptor,
+	(struct usb_descriptor_header *) &gser_descriptor,
+	(struct usb_descriptor_header *) &gser_union_desc,
+	(struct usb_descriptor_header *) &gser_hs_notify_desc,
+	(struct usb_descriptor_header *) &gser_data_interface_desc,
+	(struct usb_descriptor_header *) &gser_hs_in_desc,
+	(struct usb_descriptor_header *) &gser_hs_out_desc,
+	NULL,
+};
+#if 0
 static struct usb_endpoint_descriptor gser_ss_in_desc __initdata = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
@@ -252,11 +391,12 @@ static struct usb_descriptor_header *gser_ss_function[] __initdata = {
 	(struct usb_descriptor_header *) &gser_ss_bulk_comp_desc,
 	NULL,
 };
-
+#endif
+#endif
 /* string descriptors: */
 
 static struct usb_string gser_string_defs[] = {
-	[0].s = "Generic Serial",
+	[0].s = "softbank 201K",
 	{  } /* end of list */
 };
 
@@ -519,44 +659,48 @@ static int gser_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	/* we know alt == 0, so this is an activation or a reset */
 
 #ifdef CONFIG_MODEM_SUPPORT
-	if (gser->notify->driver_data) {
-		DBG(cdev, "reset generic ctl ttyGS%d\n", gser->port_num);
-		usb_ep_disable(gser->notify);
-	}
-
-	if (!gser->notify->desc) {
-		if (config_ep_by_speed(cdev->gadget, f, gser->notify)) {
-			gser->notify->desc = NULL;
-			return -EINVAL;
+	if (intf == gser->ctrl_id) {
+		if (gser->notify->driver_data) {
+			DBG(cdev, "reset generic ctl ttyGS%d\n", gser->port_num);
+			usb_ep_disable(gser->notify);
 		}
-	}
-	rc = usb_ep_enable(gser->notify);
 
-	if (rc) {
-		ERROR(cdev, "can't enable %s, result %d\n",
-					gser->notify->name, rc);
-		return rc;
-	}
-	gser->notify->driver_data = gser;
+		if (!gser->notify->desc) {
+			if (config_ep_by_speed(cdev->gadget, f, gser->notify)) {
+				gser->notify->desc = NULL;
+				return -EINVAL;
+			}
+		}
+		rc = usb_ep_enable(gser->notify);
+
+		if (rc) {
+			ERROR(cdev, "can't enable %s, result %d\n",
+						gser->notify->name, rc);
+			return rc;
+		}
+		gser->notify->driver_data = gser;
+	} else if (intf == gser->data_id)
 #endif
+	{
 
-	if (gser->port.in->driver_data) {
-		DBG(cdev, "reset generic data ttyGS%d\n", gser->port_num);
-		gport_disconnect(gser);
-	}
-	if (!gser->port.in->desc || !gser->port.out->desc) {
-		DBG(cdev, "activate generic ttyGS%d\n", gser->port_num);
-		if (config_ep_by_speed(cdev->gadget, f, gser->port.in) ||
-		    config_ep_by_speed(cdev->gadget, f, gser->port.out)) {
-			gser->port.in->desc = NULL;
-			gser->port.out->desc = NULL;
-			return -EINVAL;
+		if (gser->port.in->driver_data) {
+			DBG(cdev, "reset generic data ttyGS%d\n", gser->port_num);
+			gport_disconnect(gser);
 		}
+		if (!gser->port.in->desc || !gser->port.out->desc) {
+			DBG(cdev, "activate generic ttyGS%d\n", gser->port_num);
+			if (config_ep_by_speed(cdev->gadget, f, gser->port.in) ||
+				config_ep_by_speed(cdev->gadget, f, gser->port.out)) {
+				gser->port.in->desc = NULL;
+				gser->port.out->desc = NULL;
+				return -EINVAL;
+			}
+		}
+
+		gport_connect(gser);
+
+		gser->online = 1;
 	}
-
-	gport_connect(gser);
-
-	gser->online = 1;
 	return rc;
 }
 
@@ -599,7 +743,7 @@ static int gser_notify(struct f_gser *gser, u8 type, u16 value,
 			| USB_RECIP_INTERFACE;
 	notify->bNotificationType = type;
 	notify->wValue = cpu_to_le16(value);
-	notify->wIndex = cpu_to_le16(gser->data_id);
+	notify->wIndex = cpu_to_le16(gser->ctrl_id);
 	notify->wLength = cpu_to_le16(length);
 	memcpy(buf, data, length);
 
@@ -752,12 +896,32 @@ gser_bind(struct usb_configuration *c, struct usb_function *f)
 	int			status;
 	struct usb_ep		*ep;
 
+#if 0
 	/* allocate instance-specific interface IDs */
 	status = usb_interface_id(c, f);
 	if (status < 0)
 		goto fail;
 	gser->data_id = status;
 	gser_interface_desc.bInterfaceNumber = status;
+#else
+	/* allocate instance-specific interface IDs, and patch descriptors */
+	status = usb_interface_id(c, f);
+	if (status < 0)
+		goto fail;
+	gser->ctrl_id = status;
+
+	gser_control_interface_desc.bInterfaceNumber = status;
+	gser_union_desc .bMasterInterface0 = status;
+
+	status = usb_interface_id(c, f);
+	if (status < 0)
+		goto fail;
+	gser->data_id = status;
+
+	gser_data_interface_desc.bInterfaceNumber = status;
+	gser_union_desc.bSlaveInterface0 = status;
+	gser_call_mgmt_descriptor.bDataInterface = status;
+#endif
 
 	status = -ENODEV;
 
@@ -818,6 +982,7 @@ gser_bind(struct usb_configuration *c, struct usb_function *f)
 			goto fail;
 
 	}
+#if 0
 	if (gadget_is_superspeed(c->cdev->gadget)) {
 		gser_ss_in_desc.bEndpointAddress =
 			gser_fs_in_desc.bEndpointAddress;
@@ -829,10 +994,10 @@ gser_bind(struct usb_configuration *c, struct usb_function *f)
 		if (!f->ss_descriptors)
 			goto fail;
 	}
-
+#endif
 	DBG(cdev, "generic ttyGS%d: %s speed IN/%s OUT/%s\n",
 			gser->port_num,
-			gadget_is_superspeed(c->cdev->gadget) ? "super" :
+//			gadget_is_superspeed(c->cdev->gadget) ? "super" :
 			gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
 			gser->port.in->name, gser->port.out->name);
 	return 0;
@@ -903,6 +1068,7 @@ int gser_bind_config(struct usb_configuration *c, u8 port_num)
 		if (status < 0)
 			return status;
 		gser_string_defs[0].id = status;
+		gser_control_interface_desc.iInterface = status;
 	}
 
 	/* allocate and initialize one new instance */

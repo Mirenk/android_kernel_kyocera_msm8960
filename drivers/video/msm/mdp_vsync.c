@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 /* Copyright (c) 2008-2009, 2012 Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -34,6 +38,7 @@
 #include "mdp.h"
 #include "msm_fb.h"
 #include "mddihost.h"
+#include "disp_ext.h"
 
 #ifdef CONFIG_FB_MSM_MDP40
 #include "mdp4.h"
@@ -73,6 +78,9 @@ static struct msm_fb_data_type *vsync_mfd;
 static unsigned char timer_shutdown_flag;
 static uint32 vsync_cnt_cfg;
 
+#ifdef CONFIG_DISP_EXT_REFRESH
+static struct msm_fb_data_type *mdp_vsync_mfd;
+#endif /* CONFIG_DISP_EXT_REFRESH */
 
 void vsync_clk_prepare_enable(void)
 {
@@ -313,6 +321,10 @@ void mdp_config_vsync(struct platform_device *pdev,
 		goto err_handle;
 	}
 
+#ifdef CONFIG_DISP_EXT_REFRESH
+	mdp_vsync_mfd = mfd;
+#endif /* CONFIG_DISP_EXT_REFRESH */
+
 	vsync_clk_status = 0;
 	if (mfd->panel_info.lcd.vsync_enable) {
 		mfd->total_porch_lines = mfd->panel_info.lcd.v_back_porch +
@@ -352,9 +364,13 @@ void mdp_config_vsync(struct platform_device *pdev,
 				vsync_cnt_cfg_dem =
 				    (mfd->panel_info.lcd.refx100 *
 				     mfd->total_lcd_lines) / 100;
+#ifdef CONFIG_DISP_EXT_UTIL_VSYNC
+				vsync_cnt_cfg = disp_ext_util_get_vsync_count();
+#else
 				vsync_cnt_cfg =
 				    (mdp_vsync_clk_speed_hz) /
 				    vsync_cnt_cfg_dem;
+#endif /*CONFIG_DISP_EXT_UTIL_VSYNC*/
 				mdp_vsync_cfg_regs(mfd, TRUE);
 			}
 		}
@@ -502,3 +518,26 @@ uint32 mdp_get_lcd_line_counter(struct msm_fb_data_type *mfd)
 
 	return lcd_line;
 }
+
+#ifdef CONFIG_DISP_EXT_REFRESH
+void mdp_hw_vsync_irq_reg(void)
+{
+	u32 vsync_gpio;
+	int ret = 0;
+
+    DISP_LOCAL_LOG_EMERG("DISP mdp_hw_vsync_irq_reg S\n");
+	if( mdp_vsync_mfd == NULL ) {
+		pr_debug("%s:bot found device\n", __func__);
+        DISP_LOCAL_LOG_EMERG("DISP mdp_hw_vsync_irq_reg err1\n");
+		return;
+	}
+
+	vsync_gpio = mdp_vsync_mfd->vsync_gpio;
+	mdp_vsync_mfd->channel_irq = MSM_GPIO_TO_INT(vsync_gpio);
+	ret = request_irq(mdp_vsync_mfd->channel_irq,
+					&disp_ext_refresh_hw_vsync_irq,
+					IRQF_TRIGGER_FALLING, "VSYNC_GPIO",
+					(void *)mdp_vsync_mfd);
+    DISP_LOCAL_LOG_EMERG("DISP mdp_hw_vsync_irq_reg E\n");
+}
+#endif /* CONFIG_DISP_EXT_REFRESH */

@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * (C) 2013 KYOCERA Corporation
+ */
 
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -74,10 +79,12 @@
 #define MSM_GSBI12_PHYS		0x12480000
 
 #define MSM_UART2DM_PHYS	(MSM_GSBI2_PHYS + 0x40000)
+#define MSM_UART4DM_PHYS	(MSM_GSBI4_PHYS + 0x40000)
 #define MSM_UART5DM_PHYS	(MSM_GSBI5_PHYS + 0x40000)
 #define MSM_UART6DM_PHYS	(MSM_GSBI6_PHYS + 0x40000)
 #define MSM_UART8DM_PHYS	(MSM_GSBI8_PHYS + 0x40000)
 #define MSM_UART9DM_PHYS	(MSM_GSBI9_PHYS + 0x40000)
+#define MSM_UART12DM_PHYS	(MSM_GSBI12_PHYS + 0x10000)
 
 /* GSBI QUP devices */
 #define MSM_GSBI1_QUP_PHYS	(MSM_GSBI1_PHYS + 0x80000)
@@ -292,6 +299,34 @@ struct platform_device msm_device_uart_dm6 = {
 		.coherent_dma_mask	= DMA_BIT_MASK(32),
 	},
 };
+
+static struct resource resources_uart_gsbi4[] = {
+	{
+		.start	= GSBI4_UARTDM_IRQ,
+		.end	= GSBI4_UARTDM_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start	= MSM_UART4DM_PHYS,
+		.end	= MSM_UART4DM_PHYS + PAGE_SIZE - 1,
+		.name	= "uartdm_resource",
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= MSM_GSBI4_PHYS,
+		.end	= MSM_GSBI4_PHYS + PAGE_SIZE - 1,
+		.name	= "gsbi_resource",
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+struct platform_device msm8960_device_uart_gsbi4 = {
+	.name	= "msm_serial_hsl",
+	.id	= 4,
+	.num_resources	= ARRAY_SIZE(resources_uart_gsbi4),
+	.resource	= resources_uart_gsbi4,
+};
+
 /*
  * GSBI 9 used into UARTDM Mode
  * For 8960 Fusion 2.2 Primary IPC
@@ -396,6 +431,34 @@ struct platform_device msm8960_device_uart_gsbi8 = {
 	.num_resources	   = ARRAY_SIZE(resources_uart_gsbi8),
 	.resource	   = resources_uart_gsbi8,
 	.dev.platform_data = &uart_gsbi8_pdata,
+};
+
+/* GSBI 12 used into UARTDM Mode */
+static struct resource resources_uart_gsbi12[] = {
+	{
+		.start	= GSBI12_UARTDM_IRQ,
+		.end	= GSBI12_UARTDM_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start	= MSM_UART12DM_PHYS,
+		.end	= MSM_UART12DM_PHYS + PAGE_SIZE - 1,
+		.name	= "uartdm_resource",
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= MSM_GSBI12_PHYS,
+		.end	= MSM_GSBI12_PHYS + PAGE_SIZE - 1,
+		.name	= "gsbi_resource",
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+struct platform_device msm8960_device_uart_gsbi12 = {
+	.name	= "msm_serial_hsl",
+	.id	= 2,
+	.num_resources	= ARRAY_SIZE(resources_uart_gsbi12),
+	.resource	= resources_uart_gsbi12,
 };
 
 /* MSM Video core device */
@@ -1342,6 +1405,47 @@ int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat)
 	return platform_device_register(pdev);
 }
 
+static struct resource resources_qup_i2c_gsbi2[] = {
+	{
+		.name	= "gsbi_qup_i2c_addr",
+		.start	= MSM_GSBI2_PHYS,
+		.end	= MSM_GSBI2_PHYS + 4 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_phys_addr",
+		.start	= MSM_GSBI2_QUP_PHYS,
+		.end	= MSM_GSBI2_QUP_PHYS + MSM_QUP_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_err_intr",
+		.start	= MSM8960_GSBI2_QUP_IRQ,
+		.end	= MSM8960_GSBI2_QUP_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "i2c_sda",
+		.start	= 12,
+		.end	= 12,
+		.flags	= IORESOURCE_IO,
+	},
+	{
+		.name	= "i2c_clk",
+		.start	= 13,
+		.end	= 13,
+		.flags	= IORESOURCE_IO,
+	},
+};
+
+struct platform_device msm8960_device_qup_i2c_gsbi2 = {
+	.name		= "qup_i2c",
+	.id		= 2,
+	.num_resources	= ARRAY_SIZE(resources_qup_i2c_gsbi2),
+	.resource	= resources_qup_i2c_gsbi2,
+};
+
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 static struct resource resources_qup_i2c_gsbi4[] = {
 	{
 		.name	= "gsbi_qup_i2c_addr",
@@ -1369,6 +1473,37 @@ struct platform_device msm8960_device_qup_i2c_gsbi4 = {
 	.num_resources	= ARRAY_SIZE(resources_qup_i2c_gsbi4),
 	.resource	= resources_qup_i2c_gsbi4,
 };
+#endif
+
+#ifdef QUALCOMM_ORIGINAL_FEATURE
+static struct resource resources_qup_i2c_gsbi3[] = {
+	{
+		.name	= "gsbi_qup_i2c_addr",
+		.start	= MSM_GSBI3_PHYS,
+		.end	= MSM_GSBI3_PHYS + 4 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_phys_addr",
+		.start	= MSM_GSBI3_QUP_PHYS,
+		.end	= MSM_GSBI3_QUP_PHYS + MSM_QUP_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_err_intr",
+		.start	= GSBI3_QUP_IRQ,
+		.end	= GSBI3_QUP_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm8960_device_qup_i2c_gsbi3 = {
+	.name		= "qup_i2c",
+	.id		= 3,
+	.num_resources	= ARRAY_SIZE(resources_qup_i2c_gsbi3),
+	.resource	= resources_qup_i2c_gsbi3,
+};
+#endif
 
 static struct resource resources_qup_i2c_gsbi3[] = {
 	{
@@ -1388,6 +1523,18 @@ static struct resource resources_qup_i2c_gsbi3[] = {
 		.start	= GSBI3_QUP_IRQ,
 		.end	= GSBI3_QUP_IRQ,
 		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "i2c_sda",
+		.start	= 16,
+		.end	= 16,
+		.flags	= IORESOURCE_IO,
+	},
+	{
+		.name	= "i2c_clk",
+		.start	= 17,
+		.end	= 17,
+		.flags	= IORESOURCE_IO,
 	},
 };
 
@@ -1426,6 +1573,7 @@ struct platform_device msm8960_device_qup_i2c_gsbi9 = {
 	.resource	= resources_qup_i2c_gsbi9,
 };
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 static struct resource resources_qup_i2c_gsbi10[] = {
 	{
 		.name	= "gsbi_qup_i2c_addr",
@@ -1453,6 +1601,49 @@ struct platform_device msm8960_device_qup_i2c_gsbi10 = {
 	.num_resources	= ARRAY_SIZE(resources_qup_i2c_gsbi10),
 	.resource	= resources_qup_i2c_gsbi10,
 };
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_KC
+static struct resource resources_qup_i2c_gsbi11[] = {
+	{
+		.name	= "gsbi_qup_i2c_addr",
+		.start	= MSM_GSBI11_PHYS,
+		.end	= MSM_GSBI11_PHYS + 4 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_phys_addr",
+		.start	= MSM_GSBI11_QUP_PHYS,
+		.end	= MSM_GSBI11_QUP_PHYS + MSM_QUP_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_err_intr",
+		.start	= GSBI11_QUP_IRQ,
+		.end	= GSBI11_QUP_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "i2c_sda",
+		.start	= 40,
+		.end	= 40,
+		.flags	= IORESOURCE_IO,
+	},
+	{
+		.name	= "i2c_clk",
+		.start	= 41,
+		.end	= 41,
+		.flags	= IORESOURCE_IO,
+	},
+};
+
+struct platform_device msm8960_device_qup_i2c_gsbi11 = {
+	.name		= "qup_i2c",
+	.id		= 11,
+	.num_resources	= ARRAY_SIZE(resources_qup_i2c_gsbi11),
+	.resource	= resources_qup_i2c_gsbi11,
+};
+#endif
 
 static struct resource resources_qup_i2c_gsbi12[] = {
 	{
@@ -1472,6 +1663,18 @@ static struct resource resources_qup_i2c_gsbi12[] = {
 		.start	= GSBI12_QUP_IRQ,
 		.end	= GSBI12_QUP_IRQ,
 		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "i2c_sda",
+		.start	= 44,
+		.end	= 44,
+		.flags	= IORESOURCE_IO,
+	},
+	{
+		.name	= "i2c_clk",
+		.start	= 45,
+		.end	= 45,
+		.flags	= IORESOURCE_IO,
 	},
 };
 
@@ -1709,13 +1912,13 @@ struct platform_device msm8960_device_vpe = {
 #define MSM_TSIF_SIZE        (0x200)
 
 #define TSIF_0_CLK       GPIO_CFG(75, 1, GPIO_CFG_INPUT, \
-	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+	GPIO_CFG_NO_PULL, GPIO_CFG_2MA)
 #define TSIF_0_EN        GPIO_CFG(76, 1, GPIO_CFG_INPUT, \
-	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+	GPIO_CFG_NO_PULL, GPIO_CFG_2MA)
 #define TSIF_0_DATA      GPIO_CFG(77, 1, GPIO_CFG_INPUT, \
-	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+	GPIO_CFG_NO_PULL, GPIO_CFG_2MA)
 #define TSIF_0_SYNC      GPIO_CFG(82, 1, GPIO_CFG_INPUT, \
-	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+	GPIO_CFG_NO_PULL, GPIO_CFG_2MA)
 #define TSIF_1_CLK       GPIO_CFG(79, 1, GPIO_CFG_INPUT, \
 	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
 #define TSIF_1_EN        GPIO_CFG(80, 1, GPIO_CFG_INPUT, \

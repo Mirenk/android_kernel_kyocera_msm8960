@@ -9,6 +9,11 @@
  *
  *  You may use this code as per GPL version 2
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2011 KYOCERA Corporation
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #ifndef __LINUX_POWER_SUPPLY_H__
 #define __LINUX_POWER_SUPPLY_H__
@@ -77,6 +82,13 @@ enum {
 };
 
 enum {
+	POWER_SUPPLY_OEM_CONNECT_NONE = 0,
+	POWER_SUPPLY_OEM_CONNECT_USB,
+	POWER_SUPPLY_OEM_CONNECT_CHARGE_STAND_1,
+	POWER_SUPPLY_OEM_CONNECT_CHARGE_STAND_2
+};
+
+enum {
 	POWER_SUPPLY_SCOPE_UNKNOWN = 0,
 	POWER_SUPPLY_SCOPE_SYSTEM,
 	POWER_SUPPLY_SCOPE_DEVICE,
@@ -125,6 +137,11 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_TIME_TO_FULL_AVG,
 	POWER_SUPPLY_PROP_TYPE, /* use power_supply.type instead */
 	POWER_SUPPLY_PROP_SCOPE,
+	POWER_SUPPLY_PROP_OEM_PA_THERM,
+	POWER_SUPPLY_PROP_OEM_CAMERA_THERM,
+	POWER_SUPPLY_PROP_OEM_SUBSTRATE_THERM,
+	POWER_SUPPLY_PROP_OEM_CHARGE_CONNECT_STATE,
+	POWER_SUPPLY_PROP_OEM_BMS_CYCLE,
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,
@@ -140,6 +157,7 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_USB_DCP,	/* Dedicated Charging Port */
 	POWER_SUPPLY_TYPE_USB_CDP,	/* Charging Downstream Port */
 	POWER_SUPPLY_TYPE_USB_ACA,	/* Accessory Charger Adapters */
+	POWER_SUPPLY_TYPE_MHL,
 	POWER_SUPPLY_TYPE_BMS,		/* Battery Monitor System */
 };
 

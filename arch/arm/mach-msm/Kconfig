@@ -1,3 +1,7 @@
+#
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2012 KYOCERA Corporation
+#
 if ARCH_MSM
 
 menu "MSM SoC Type"
@@ -2464,5 +2468,19 @@ config MSM_HSIC_SYSMON_TEST
 	  This will create a debugfs file entry named "hsic_sysmon_test" which
 	  can be read and written to send character data to the sysmon port of
 	  the modem over USB.
+
+config ANDROID_RAM_CONSOLE
+	bool "Android RAM buffer console"
+	default n
+
+config ANDROID_RAM_CONSOLE_ADDR
+	hex "Android RAM console virtual address"
+	default 0
+	depends on ANDROID_RAM_CONSOLE
+
+config ANDROID_RAM_CONSOLE_SIZE
+	hex "Android RAM console buffer size"
+	default 0
+	depends on ANDROID_RAM_CONSOLE
 
 endif

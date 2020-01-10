@@ -9,10 +9,17 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*********************************************************************
+ * 
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * 
+ *********************************************************************/
 
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
+#include <linux/export.h>
 
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
@@ -24,6 +31,7 @@
 #include "mmc_ops.h"
 #include "sd.h"
 #include "sd_ops.h"
+#include "sdio_ops.h"
 
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
@@ -1332,4 +1340,54 @@ err:
 
 	return err;
 }
+
+static unsigned int sdhub_bus_width;
+static int mmc_sdhub_resume(struct mmc_host *host)
+{
+    sdio_reset(host);
+    mmc_go_idle(host);
+    mmc_set_bus_width(host, sdhub_bus_width);
+
+    return 0;
+}
+
+static const struct mmc_bus_ops mmc_sdhub_ops = {
+    .remove = NULL,
+    .detect = NULL,
+    .suspend = mmc_sd_suspend,
+    .resume = mmc_sdhub_resume,
+    .power_restore = NULL,
+};
+
+int init_sdhub(struct mmc_host *host, unsigned int width)
+{
+    int err = -1;
+    struct mmc_card *card;
+    BUG_ON(!host);
+    WARN_ON(!host->claimed);
+    
+    mmc_attach_bus(host, &mmc_sdhub_ops);
+    host->ocr = host->ocr_avail;
+    
+    //Allocate card structure.
+    card = mmc_alloc_card(host, &sd_type);
+    if (IS_ERR(card)) {
+        err = PTR_ERR(card);
+        goto sdhub_error;
+    }
+    card->type = MMC_TYPE_SD;
+    
+    //set bus width.
+    sdhub_bus_width = width;
+    mmc_set_bus_width(host, width);
+    host->card = card;
+
+    return 0;
+
+sdhub_error:
+    mmc_detach_bus(host);
+
+    return err;
+}
+EXPORT_SYMBOL_GPL(init_sdhub);
 

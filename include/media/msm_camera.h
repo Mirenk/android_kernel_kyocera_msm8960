@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
+
 #ifndef __LINUX_MSM_CAMERA_H
 #define __LINUX_MSM_CAMERA_H
 
@@ -446,6 +451,7 @@ struct msm_camera_cfg_cmd {
 #define CMD_AXI_CFG_VIDEO_ALL_CHNLS 50
 #define CMD_VFE_BUFFER_RELEASE 51
 #define CMD_VFE_PROCESS_IRQ 52
+#define CMD_VFE_SET_FRAME_SKIP 53
 
 #define CMD_AXI_CFG_PRIM               BIT(8)
 #define CMD_AXI_CFG_PRIM_ALL_CHNLS     BIT(9)
@@ -695,7 +701,9 @@ struct msm_stats_buf {
 	(MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+7)
 #define MSM_V4L2_EXT_CAPTURE_MODE_RDI2 \
 	(MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+8)
-#define MSM_V4L2_EXT_CAPTURE_MODE_MAX (MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+9)
+#define MSM_V4L2_EXT_CAPTURE_MODE_V2X_LIVESHOT \
+	(MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+9)
+#define MSM_V4L2_EXT_CAPTURE_MODE_MAX (MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+10)
 
 
 #define MSM_V4L2_PID_MOTION_ISO              V4L2_CID_PRIVATE_BASE
@@ -816,7 +824,11 @@ struct msm_snapshot_pp_status {
 #define CFG_START_STREAM              44
 #define CFG_STOP_STREAM               45
 #define CFG_GET_CSI_PARAMS            46
-#define CFG_MAX			47
+#define CFG_GET_EXP_TIME              47
+#define CFG_GET_IS_FLASH              48
+#define CFG_SET_NOTE_TAKEPIC          49
+#define CFG_SET_AF_MODE               50
+#define CFG_MAX			51
 
 
 #define MOVE_NEAR	0
@@ -915,7 +927,7 @@ struct msm_snapshot_pp_status {
 #define  CAMERA_WB_CLOUDY_DAYLIGHT    6
 #define  CAMERA_WB_TWILIGHT           7
 #define  CAMERA_WB_SHADE              8
-
+//#define  CAMERA_WB_WARM_FLUORESCENT   10
 #define CAMERA_EXPOSURE_COMPENSATION_LV0			12
 #define CAMERA_EXPOSURE_COMPENSATION_LV1			6
 #define CAMERA_EXPOSURE_COMPENSATION_LV2			0
@@ -1113,6 +1125,17 @@ enum msm_sensor_resolution_t {
 	MSM_SENSOR_RES_5,
 	MSM_SENSOR_RES_6,
 	MSM_SENSOR_RES_7,
+	MSM_SENSOR_RES_8,
+	MSM_SENSOR_RES_9,
+	MSM_SENSOR_RES_10,
+	MSM_SENSOR_RES_11,
+	MSM_SENSOR_RES_12,
+	MSM_SENSOR_RES_13,
+	MSM_SENSOR_RES_14,
+	MSM_SENSOR_RES_15,
+	MSM_SENSOR_RES_16,
+	MSM_SENSOR_RES_17,
+	MSM_SENSOR_RES_18,
 	MSM_SENSOR_INVALID_RES,
 };
 
@@ -1291,6 +1314,8 @@ struct sensor_cfg_data {
 		struct cord aec_cord;
 		int is_autoflash;
 		struct mirror_flip mirror_flip;
+		uint32_t exp_time;
+		uint8_t is_flash;
 	} cfg;
 };
 
@@ -1409,6 +1434,7 @@ struct msm_actuator_cfg_data {
 		struct msm_actuator_set_info_t set_info;
 		struct msm_actuator_get_info_t get_info;
 		enum af_camera_name cam_name;
+	    uint8_t mode;
 	} cfg;
 };
 

@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -30,6 +34,7 @@
 #include "msm_fb.h"
 #include "mipi_dsi.h"
 #include "mdp4.h"
+#include "disp_ext.h"
 
 static int vsync_start_y_adjust = 4;
 
@@ -751,6 +756,11 @@ void mdp4_mipi_vsync_enable(struct msm_fb_data_type *mfd,
 		else
 			start_y = (mfd->total_lcd_lines - 1) -
 				(vsync_start_y_adjust - pipe->dst_y);
+
+#ifdef CONFIG_DISP_EXT_UTIL_VSYNC
+		start_y = disp_ext_util_vsync_cal_start(start_y);
+#endif /*CONFIG_DISP_EXT_UTIL_VSYNC*/
+
 		if (which == 0)
 			MDP_OUTP(MDP_BASE + 0x210, start_y);	/* primary */
 		else
@@ -1115,12 +1125,12 @@ void mdp4_dsi_cmd_overlay(struct msm_fb_data_type *mfd)
 	vctrl = &vsync_ctrl_db[cndx];
 
 	if (!mfd->panel_power_on)
-		return;
+		goto out;
 
 	pipe = vctrl->base_pipe;
 	if (pipe == NULL) {
 		pr_err("%s: NO base pipe\n", __func__);
-		return;
+		goto out;
 	}
 
 	mutex_lock(&vctrl->update_lock);
@@ -1128,7 +1138,7 @@ void mdp4_dsi_cmd_overlay(struct msm_fb_data_type *mfd)
 		mutex_unlock(&vctrl->update_lock);
 		mutex_unlock(&mfd->dma->ov_mutex);
 		pr_err("%s: suspended, no more pan display\n", __func__);
-		return;
+		goto out;
 	}
 
 	spin_lock_irqsave(&vctrl->spin_lock, flags);
@@ -1162,4 +1172,72 @@ void mdp4_dsi_cmd_overlay(struct msm_fb_data_type *mfd)
 	mdp4_dsi_cmd_pipe_commit(cndx, 0);
 	mdp4_overlay_mdp_perf_upd(mfd, 0);
 	mutex_unlock(&mfd->dma->ov_mutex);
+out:
+	if (mfd->pan_waiting) {
+		mfd->pan_waiting = FALSE;
+		complete(&mfd->pan_comp);
+	}
+}
+
+static void mdp4_dsi_cmd_overlay_nolock( struct msm_fb_data_type *mfd )
+{
+	int cndx = 0;
+	struct vsycn_ctrl *vctrl;
+	struct mdp4_overlay_pipe *pipe;
+
+	vctrl = &vsync_ctrl_db[cndx];
+
+	pipe = vctrl->base_pipe;
+	if (pipe == NULL) {
+		pr_err("%s: NO base pipe\n", __func__);
+		return;
+	}
+	mdp_clk_ctrl(1);
+
+	if (pipe->mixer_stage == MDP4_MIXER_STAGE_BASE) {
+		mdp4_mipi_vsync_enable(mfd, pipe, 0);
+		mdp4_overlay_setup_pipe_addr(mfd, pipe);
+		mdp4_dsi_cmd_pipe_queue(0, pipe);
+	}
+
+	mdp4_overlay_mdp_perf_upd(mfd, 1);
+
+	mdp4_dsi_cmd_pipe_commit(cndx, 0);
+	mdp4_dsi_cmd_busy();
+
+	mdp4_overlay_mdp_perf_upd(mfd, 0);
+	mdp_clk_ctrl(0);
+}
+
+void mdp4_dsi_refresh_screen_at_once( struct msm_fb_data_type *mfd )
+{
+    DISP_LOCAL_LOG_EMERG("DISP mdp4_dsi_refresh_screen_at_once S\n");
+	if (mfd) {
+		mdp4_dsi_cmd_overlay_nolock( mfd );
+	}
+    DISP_LOCAL_LOG_EMERG("DISP mdp4_dsi_refresh_screen_at_once E\n");
+}
+
+void mdp4_dsi_clock_mod( void )
+{
+}
+
+void mdp4_dsi_cmd_busy( void )
+{
+	struct vsycn_ctrl *vctrl;
+	unsigned long flags;
+	int need_dmap_wait = 0;
+
+	vctrl = &vsync_ctrl_db[0];
+
+	spin_lock_irqsave(&vctrl->spin_lock, flags);
+	if (vctrl->dmap_koff != vctrl->dmap_done) {
+		INIT_COMPLETION(vctrl->dmap_comp);
+		need_dmap_wait = 1;
+	}
+	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
+
+	if (need_dmap_wait) {
+		mdp4_dsi_cmd_wait4dmap(0);
+	}
 }

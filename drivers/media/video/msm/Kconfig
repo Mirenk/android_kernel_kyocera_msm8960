@@ -1,3 +1,8 @@
+#
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2012 KYOCERA Corporation
+#
+
 config MSM_CAMERA_V4L2
         bool "MSM Camera V4L2 Interface"
         depends on MSM_CAMERA
@@ -16,15 +21,15 @@ config MT9T013
 	default y
 	---help---
 	  MICRON 3M Bayer Sensor with AutoFocus
-config MT9D113
-	bool "Sensor mt9d113 (YUV 2M)"
-	depends on MSM_CAMERA && ARCH_MSM8X60 && !MSM_CAMERA_V4L2
-	default y
-	---help---
-	  MICRON 2M YUV Sensor
-	  This sensor is the front camera on QT8660.
-	  This uses csi mipi interface.
-	  This sensor is used only on QT device.
+#config MT9D113
+#	bool "Sensor mt9d113 (YUV 2M)"
+#	depends on MSM_CAMERA && ARCH_MSM8X60 && !MSM_CAMERA_V4L2
+#	default y
+#	---help---
+#	  MICRON 2M YUV Sensor
+#	  This sensor is the front camera on QT8660.
+#	  This uses csi mipi interface.
+#	  This sensor is used only on QT device.
 config MT9D112
 	bool "Sensor mt9d112 (YUV 2M)"
 	depends on MSM_CAMERA && !ARCH_MSM8X60 && !ARCH_MSM8960 && !MSM_CAMERA_V4L2
@@ -33,7 +38,7 @@ config MT9D112
 	  MICRON 2M YUV Sensor
 config IMX074
 	bool "Sensor IMX074 (BAYER 13.5M)"
-	depends on MSM_CAMERA
+	default n
 	---help---
 	SONY 13.5 MP Bayer Sensor
 config OV5640
@@ -45,13 +50,13 @@ config OV5640
 
 config OV5647
 	bool "Sensor ov5647 (BAYER 5M)"
-	depends on MSM_CAMERA
+	default n
 	---help---
 	  OV 5M Bayer Sensor with AutoFocus
 
 config AD5046_ACT
 	bool "Lens actuator ad5046"
-	depends on MSM_CAMERA && OV5647
+	default n
 	---help---
 	  ad5046 lens actuator driver for ov5647.
 	  Say Y here if this is msm7627A variant platform.
@@ -63,7 +68,7 @@ config WEBCAM_OV7692_QRD
 	  Omni Vision VGA YUV Sensor for QRD Devices
 config MT9M114
         bool "Sensor MT9M114 (YUV 1.26M)"
-        depends on MSM_CAMERA
+		default n
         ---help---
         APTINA 1.26 MP yuv Sensor
 config WEBCAM_OV7692
@@ -133,6 +138,7 @@ config MT9E013
 config IMX074_ACT
 	bool "Actuator IMX074 (BAYER 13.5M)"
 	depends on MSM_CAMERA
+	default n
 	---help---
 	Actuator for SONY 13.5 MP Bayer Sensor
 
@@ -197,7 +203,25 @@ config IMX072
 
 config OV2720
 	bool "Sensor ov2720 (Omnivision 2MP)"
-	depends on MSM_CAMERA
+	default n
+	
+	
+config S5K8AAY
+	bool "Sensor S5K8AAY (YUV 1.2MP)"
+	default n
+#	depends on MSM_CAMERA && ARCH_MSM8960
+
+config MT9D113
+	bool "Sensor MT9D113 (YUV 2MP)"
+	depends on MSM_CAMERA && ARCH_MSM8960
+	default y
+
+config IMX111
+	bool "Sensor IMX111 (Sony 8MP)"
+	depends on MSM_CAMERA && ARCH_MSM8960
+	default y
+	---help---
+	  Sony 2D 8M with Autofocus
 
 config OV8825
 	bool "Sensor ov8825 (Omnivision 8M)"
@@ -236,10 +260,17 @@ config MSM_EEPROM
 config IMX074_EEPROM
 	bool "IMX074 EEPROM support"
 	depends on MSM_CAMERA
+	default n
 
 config IMX091_EEPROM
 	bool "IMX091 EEPROM support"
 	depends on MSM_CAMERA
+	default n
+
+config IMX111_EEPROM
+	bool "IMX111 EEPROM support"
+	depends on MSM_CAMERA
+	default y
 
 config MSM_GEMINI
 	tristate "Qualcomm MSM Gemini Jpeg Engine support"
@@ -268,7 +299,7 @@ config QUP_EXCLUSIVE_TO_CAMERA
 
 config S5K3L1YX
 	bool "Sensor S5K3L1YX (BAYER 12M)"
-	depends on MSM_CAMERA
+	default n
 	---help---
 		Samsung 12 MP Bayer Sensor with auto focus, uses
 		4 mipi lanes, preview config = 1984 * 1508 at 30 fps,
@@ -277,7 +308,7 @@ config S5K3L1YX
 
 config IMX091
         bool "Sensor imx091 (Sony 13MP)"
-        depends on MSM_CAMERA
+	default n
 	---help---
 	  Sony 13MP sensor back camera that uses 4 mipi lanes,
 	  runs at 30 fps preview and 14 fps snapshot

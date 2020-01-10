@@ -15,6 +15,11 @@
  *  Big-endian to little-endian byte-swapping/bitmaps by
  *        David S. Miller (davem@caip.rutgers.edu), 1995
  */
+/*===========================================================================
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * (C) 2013 KYOCERA Corporation
+ ===========================================================================*/
 
 #include <linux/module.h>
 #include <linux/string.h>
@@ -466,6 +471,7 @@ static void ext4_journal_commit_callback(journal_t *journal, transaction_t *txn)
 
 static void ext4_handle_error(struct super_block *sb)
 {
+    save_error_info(sb, __func__, __LINE__);
 	if (sb->s_flags & MS_RDONLY)
 		return;
 
@@ -477,6 +483,7 @@ static void ext4_handle_error(struct super_block *sb)
 			jbd2_journal_abort(journal, -EIO);
 	}
 	if (test_opt(sb, ERRORS_RO)) {
+	    panic("EXT4-fs (device %s): panic forced after error\n",sb->s_id);
 		ext4_msg(sb, KERN_CRIT, "Remounting filesystem read-only");
 		sb->s_flags |= MS_RDONLY;
 	}
@@ -648,6 +655,7 @@ void __ext4_abort(struct super_block *sb, const char *function,
 	va_end(args);
 
 	if ((sb->s_flags & MS_RDONLY) == 0) {
+	    panic("EXT4-fs panic from previous error\n");
 		ext4_msg(sb, KERN_CRIT, "Remounting filesystem read-only");
 		sb->s_flags |= MS_RDONLY;
 		EXT4_SB(sb)->s_mount_flags |= EXT4_MF_FS_ABORTED;
@@ -3980,9 +3988,20 @@ static int ext4_commit_super(struct super_block *sb, int sync)
 	struct ext4_super_block *es = EXT4_SB(sb)->s_es;
 	struct buffer_head *sbh = EXT4_SB(sb)->s_sbh;
 	int error = 0;
+	int blocksize;
+	ext4_fsblk_t logical_sb_block;
+	unsigned long offset;
 
 	if (!sbh || block_device_ejected(sb))
 		return error;
+
+	blocksize = sb->s_blocksize;
+	logical_sb_block = EXT4_SB(sb)->s_sb_block * EXT4_MIN_BLOCK_SIZE;
+	offset = do_div(logical_sb_block, blocksize);
+	if (es != (struct ext4_super_block*)(((char*)sbh->b_data) + offset)) {
+		panic("EXT4-fs (device %s): panic forced from sb error\n", sb->s_id);
+	}
+
 	if (buffer_write_io_error(sbh)) {
 		/*
 		 * Oh, dear.  A previous attempt to write the

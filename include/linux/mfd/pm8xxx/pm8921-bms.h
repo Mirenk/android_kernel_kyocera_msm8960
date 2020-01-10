@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #ifndef __PM8XXX_BMS_H
 #define __PM8XXX_BMS_H
@@ -25,6 +29,12 @@
 
 #define PC_TEMP_ROWS		29
 #define PC_TEMP_COLS		8
+
+#define RBATT_ROWS		22
+#define RBATT_COLS		5
+
+#define SOC_ADJUST_ROWS		6
+#define SOC_ADJUST_COLS		8
 
 #define MAX_SINGLE_LUT_COLS	20
 
@@ -52,6 +62,23 @@ struct sf_lut {
 	int percent[PC_CC_ROWS];
 	int sf[PC_CC_ROWS][PC_CC_COLS];
 };
+
+struct rbatt_lut {
+	int rows;
+	int cols;
+	int temp[RBATT_COLS];
+	int vbatt[RBATT_ROWS];
+	int rbatt[RBATT_ROWS][RBATT_COLS];
+};
+
+struct soc_adjust_lut {
+	int rows;
+	int cols;
+	int temp[SOC_ADJUST_COLS];
+	int ibatt[SOC_ADJUST_ROWS];
+	int soc_adjust[SOC_ADJUST_ROWS][SOC_ADJUST_COLS];
+};
+
 
 /**
  * struct pc_temp_ocv_lut -
@@ -136,9 +163,71 @@ struct pm8921_bms_platform_data {
 	int				chg_term_ua;
 };
 
+struct pm8921_bms_oem_battery_data {
+	struct	rbatt_lut	*rbatt_initial_lut;
+	struct	soc_adjust_lut	*soc_adjust_lut;
+	struct	single_row_lut	*cycle_adjust_lut;
+};
+
 #if defined(CONFIG_PM8921_BMS) || defined(CONFIG_PM8921_BMS_MODULE)
 extern struct pm8921_bms_battery_data  palladium_1500_data;
 extern struct pm8921_bms_battery_data  desay_5200_data;
+extern struct pm8921_bms_oem_battery_data pm8921_bms_oem_data;
+
+enum pm8921_bms_chg_state {
+	CHG_STATE_NONCONNECTED,
+	CHG_STATE_IDLE,
+	CHG_STATE_TRICKLE,
+	CHG_STATE_FAST_COOL,
+	CHG_STATE_FAST_NORMAL,
+	CHG_STATE_FAST_WARM,
+	CHG_STATE_INTE_COOL,
+	CHG_STATE_INTE_NORMAL,
+	CHG_STATE_INTE_WARM,
+	CHG_STATE_CHG_COMP,
+	CHG_STATE_CHG_TIMEOUT,
+	CHG_STATE_CHG_STAND,
+	CHG_STATE_BATT_TEMP_COLD,
+	CHG_STATE_BATT_TEMP_HOT,
+	CHG_STATE_WAIT_TEMP,
+	CHG_STATE_BATT_ID_ERROR,
+	CHG_STATE_CHG_ERROR,
+	CHG_STATE_INIT,
+	CHG_STATE_MAX
+};
+
+enum pm8921_bms_chg_mode {
+	CHG_MODE_DISCHARGE,
+	CHG_MODE_CHARGING,
+	CHG_MODE_FULL
+};
+
+enum pm8921_bms_chg_condition {
+	CHG_CONDITION_4340MV,
+	CHG_CONDITION_4240MV,
+	CHG_CONDITION_4340MV_INTE,
+	CHG_CONDITION_4240MV_INTE,
+	CHG_CONDITION_MAX,
+	CHG_CONDITION_NULL
+};
+
+struct pm8921_bms_correction {
+	enum pm8921_bms_chg_state	chg_state;
+	enum pm8921_bms_chg_mode	chg_mode;
+	enum pm8921_bms_chg_condition	chg_condition_uim_valid;
+	enum pm8921_bms_chg_condition	chg_condition_uim_invalid;
+};
+
+enum pm8921_bms_cyclecorrect_state {
+	CHG_CYCLECORRECT_STATE_CHARGER_NO,
+	CHG_CYCLECORRECT_STATE_CHARGER_DETECTED,
+	CHG_CYCLECORRECT_STATE_OK1,
+	CHG_CYCLECORRECT_STATE_OK2,
+	CHG_CYCLECORRECT_STATE_PARAM_OBTAINED1,
+	CHG_CYCLECORRECT_STATE_PARAM_OBTAINED2,
+	CHG_CYCLECORRECT_STATE_CALCULATED
+};
+
 /**
  * pm8921_bms_get_vsense_avg - return the voltage across the sense
  *				resitor in microvolts
@@ -170,7 +259,11 @@ int pm8921_bms_get_battery_current(int *result);
  * pm8921_bms_get_percent_charge - returns the current battery charge in percent
  *
  */
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 int pm8921_bms_get_percent_charge(void);
+#else
+int pm8921_bms_get_percent_charge(int chg_state, int uim_valid);
+#endif
 
 /**
  * pm8921_bms_get_fcc - returns fcc in mAh of the battery depending on its age
@@ -205,6 +298,7 @@ int pm8921_bms_get_simultaneous_battery_voltage_and_current(int *ibat_ua,
  * pm8921_bms_get_rbatt - function to get the battery resistance in mOhm.
  */
 int pm8921_bms_get_rbatt(void);
+
 /**
  * pm8921_bms_invalidate_shutdown_soc - function to notify the bms driver that
  *					the battery was replaced between reboot
@@ -212,6 +306,33 @@ int pm8921_bms_get_rbatt(void);
  *					soc stored in a coincell backed register
  */
 void pm8921_bms_invalidate_shutdown_soc(void);
+
+/**
+ * oem_pm8921_bms_change_table - replace the parameters of the bms
+ *
+ */
+void oem_pm8921_bms_change_table(void);
+
+/**
+ * oem_pm8921_bms_low_vol_detect_active - low-voltage detection in active
+ *
+ */
+void oem_pm8921_bms_low_vol_detect_active(int vbatt, int batt_temp, int init_state);
+
+/**
+ * oem_pm8921_bms_low_vol_detect_standby - low-voltage detection in standby
+ *
+ */
+void oem_pm8921_bms_low_vol_detect_standby(int batt_temp);
+
+/**
+ * oem_pm8921_bms_detected_low_vol - low-voltage detection in standby
+ *
+ */
+void oem_pm8921_bms_detected_low_vol(int vol_mv);
+
+int oem_pm8921_bms_get_chargecycles(void);
+
 #else
 static inline int pm8921_bms_get_vsense_avg(int *result)
 {
@@ -221,7 +342,11 @@ static inline int pm8921_bms_get_battery_current(int *result)
 {
 	return -ENXIO;
 }
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 static inline int pm8921_bms_get_percent_charge(void)
+#else
+static inline int pm8921_bms_get_percent_charge(int chg_state)
+#endif
 {
 	return -ENXIO;
 }
@@ -248,6 +373,21 @@ static inline int pm8921_bms_get_rbatt(void)
 	return -EINVAL;
 }
 static inline void pm8921_bms_invalidate_shutdown_soc(void)
+{
+}
+static inline void oem_pm8921_bms_change_table(void)
+{
+}
+static inline void oem_pm8921_bms_low_vol_detect_active(int vbatt, int batt_temp, int init_state)
+{
+}
+static inline void oem_pm8921_bms_low_vol_detect_standby(int batt_temp)
+{
+}
+static inline void oem_pm8921_bms_detected_low_vol(int vol_mv)
+{
+}
+static int oem_pm8921_bms_get_chargecycles(void)
 {
 }
 #endif

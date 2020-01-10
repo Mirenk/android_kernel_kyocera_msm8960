@@ -12,6 +12,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/console.h>
 #include <linux/init.h>
@@ -50,6 +54,7 @@ void ram_console_enable_console(int enabled)
 		ram_console.flags &= ~CON_ENABLED;
 }
 
+extern void extension_ram_log_init(void);
 static int __devinit ram_console_probe(struct platform_device *pdev)
 {
 	struct ram_console_platform_data *pdata = pdev->dev.platform_data;
@@ -70,6 +75,8 @@ static int __devinit ram_console_probe(struct platform_device *pdev)
 	ram_console.data = prz;
 
 	register_console(&ram_console);
+
+	extension_ram_log_init();
 
 	return 0;
 }

@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -225,4 +229,10 @@ int msm_fb_check_frame_rate(struct msm_fb_data_type *mfd,
 int load_565rle_image(char *filename, bool bf_supported);
 #endif
 
+void msm_fb_pan_lock( void );
+void msm_fb_pan_unlock( void );
+void msm_fb_ioctl_ppp_lock( void );
+void msm_fb_ioctl_ppp_unlock( void );
+void msm_fb_ioctl_lut_lock( void );
+void msm_fb_ioctl_lut_unlock( void );
 #endif /* MSM_FB_H */

@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 #ifndef MSM_ACTUATOR_H
 #define MSM_ACTUATOR_H
 
@@ -58,6 +62,7 @@ struct msm_actuator_func_tbl {
 			struct damping_params_t *,
 			int8_t,
 			int16_t);
+	int32_t (*actuator_af_mode)(struct msm_actuator_ctrl_t *, uint8_t);
 };
 
 struct msm_actuator {
@@ -121,6 +126,9 @@ int32_t msm_actuator_write_focus2(struct msm_actuator_ctrl_t *a_ctrl,
 long msm_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg);
 int32_t msm_actuator_power(struct v4l2_subdev *sd, int on);
+int32_t msm_actuator_af_mode(
+	struct msm_actuator_ctrl_t *a_ctrl,
+	uint8_t mode);
 
 #define VIDIOC_MSM_ACTUATOR_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 11, void __user *)

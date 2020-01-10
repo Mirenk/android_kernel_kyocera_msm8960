@@ -1,3 +1,7 @@
+#
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2012 KYOCERA Corporation
+#
 
 # LED Core
 obj-$(CONFIG_NEW_LEDS)			+= led-core.o
@@ -19,6 +23,8 @@ obj-$(CONFIG_LEDS_COBALT_RAQ)		+= leds-cobalt-raq.o
 obj-$(CONFIG_LEDS_SUNFIRE)		+= leds-sunfire.o
 obj-$(CONFIG_LEDS_PCA9532)		+= leds-pca9532.o
 obj-$(CONFIG_LEDS_PM8XXX)		+= leds-pm8xxx.o
+obj-$(CONFIG_LEDS_KEY_PM8XXX)	+= leds-key-pm8xxx.o
+CFLAGS_leds-key-pm8xxx.o += -Iarch/arm/mach-msm/
 obj-$(CONFIG_LEDS_GPIO_REGISTER)	+= leds-gpio-register.o
 obj-$(CONFIG_LEDS_GPIO)			+= leds-gpio.o
 obj-$(CONFIG_LEDS_LP3944)		+= leds-lp3944.o
@@ -65,3 +71,6 @@ obj-$(CONFIG_LEDS_TRIGGER_BACKLIGHT)	+= ledtrig-backlight.o
 obj-$(CONFIG_LEDS_TRIGGER_GPIO)		+= ledtrig-gpio.o
 obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON)	+= ledtrig-default-on.o
 obj-$(CONFIG_LEDS_TRIGGER_SLEEP)	+= ledtrig-sleep.o
+
+#obj-$(CONFIG_MACH_MSM8960_KC_LM3533)	+= leds-lm3533.o
+obj-y	+= leds-lm3533.o

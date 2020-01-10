@@ -1,3 +1,8 @@
+#
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2011 KYOCERA Corporation
+# (C) 2012 KYOCERA Corporation
+#
 CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
 
 obj-y += io.o dma.o memory.o
@@ -378,9 +383,15 @@ obj-$(CONFIG_MSM_RTB) += msm_rtb.o
 obj-$(CONFIG_MSM_CACHE_ERP) += cache_erp.o
 obj-$(CONFIG_MSM_EBI_ERP) += ebi_erp.o
 obj-$(CONFIG_MSM_CACHE_DUMP) += msm_cache_dump.o
+obj-$(CONFIG_ARCH_MSM8960) += kc_pmic_test.o
 
 obj-$(CONFIG_MSM_HSIC_SYSMON) += hsic_sysmon.o
 obj-$(CONFIG_MSM_HSIC_SYSMON_TEST) += hsic_sysmon_test.o
+
+
+#Kc Board
+obj-y                           +=kc_board.o
+
 
 obj-$(CONFIG_MSM_RPM_SMD) += rpm-smd.o
 obj-$(CONFIG_MSM_CPR) += msm_cpr.o
@@ -389,3 +400,9 @@ obj-$(CONFIG_MSM_VP_REGULATOR) += msm_vp.o
 ifdef CONFIG_MSM_CPR
 obj-$(CONFIG_DEBUG_FS) += msm_cpr-debug.o
 endif
+
+#OEM FACT
+obj-y                           +=oem_fact.o
+
+obj-y                           += kclog_smem.o
+

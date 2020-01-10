@@ -10,7 +10,10 @@
  * GNU General Public License for more details.
  *
  */
-
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
@@ -21,8 +24,9 @@
 #include <linux/pm.h>
 #include <linux/cpu.h>
 #include <linux/interrupt.h>
-#include <linux/mfd/pmic8058.h>
-#include <linux/mfd/pmic8901.h>
+//#include <linux/mfd/pmic8058.h>
+//#include <linux/mfd/pmic8901.h>
+#include <linux/mfd/pm8xxx/pm8921.h>
 #include <linux/mfd/pm8xxx/misc.h>
 
 #include <asm/mach-types.h>
@@ -32,6 +36,7 @@
 #include <mach/socinfo.h>
 #include <mach/irqs.h>
 #include <mach/scm.h>
+#include <mach/oem_fact.h>
 #include "msm_watchdog.h"
 #include "timer.h"
 
@@ -76,7 +81,7 @@ static struct notifier_block panic_blk = {
 
 static void set_dload_mode(int on)
 {
-	if (dload_mode_addr) {
+	if ((dload_mode_addr) && !((restart_mode == RESTART_OEM) && (download_mode == 1))) {
 		__raw_writel(on ? 0xE47B337D : 0, dload_mode_addr);
 		__raw_writel(on ? 0xCE14091A : 0,
 		       dload_mode_addr + sizeof(unsigned int));
@@ -111,16 +116,45 @@ static int dload_set(const char *val, struct kernel_param *kp)
 void msm_set_restart_mode(int mode)
 {
 	restart_mode = mode;
+	if (mode == RESTART_DLOAD) {
+	  download_mode = mode;
+	}
 }
 EXPORT_SYMBOL(msm_set_restart_mode);
 
+extern bool is_vbus_active(void);
+extern bool msm_is_pwroff_mode(void);
+extern void msm_set_pwroff_complete(void);
+extern void diag_end_sequence_output(void);
 static void __msm_power_off(int lower_pshold)
 {
+	bool pwroff_mode,vbus_monit;
+
 	printk(KERN_CRIT "Powering off the SoC\n");
 #ifdef CONFIG_MSM_DLOAD_MODE
 	set_dload_mode(0);
 #endif
 	pm8xxx_reset_pwr_off(0);
+
+	pwroff_mode = msm_is_pwroff_mode();
+	if (pwroff_mode == true	) {
+		pr_debug("diag_end_sequence_output()\n");
+		diag_end_sequence_output();
+		msm_set_pwroff_complete();
+		for (;;) {
+			vbus_monit = is_vbus_active();
+			if (vbus_monit==false){
+				break;
+			}
+			msleep(100);
+			pr_debug("Wait VBUS OFF!!!\n");
+		}
+	}
+
+	disable_irq(PM8921_PWRKEY_PRESS_IRQ);
+	disable_irq(PM8921_DCIN_VALID_IRQ);
+	disable_irq(PM8921_USBIN_VALID_IRQ);
+	disable_irq(PM8921_RTC_ALARM_IRQ);
 
 	if (lower_pshold) {
 		__raw_writel(0, PSHOLD_CTL_SU);
@@ -256,6 +290,7 @@ static int __init msm_restart_init(void)
 #ifdef CONFIG_MSM_DLOAD_MODE
 	atomic_notifier_chain_register(&panic_notifier_list, &panic_blk);
 	dload_mode_addr = MSM_IMEM_BASE + DLOAD_MODE_ADDR;
+	download_mode = oem_fact_get_option_bit(OEM_FACT_OPTION_ITEM_02, 0x00);
 	set_dload_mode(download_mode);
 #endif
 	msm_tmr0_base = msm_timer_get_timer0_base();

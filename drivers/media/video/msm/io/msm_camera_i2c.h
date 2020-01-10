@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #ifndef MSM_CAMERA_I2C_H
 #define MSM_CAMERA_I2C_H
@@ -43,6 +47,7 @@ enum msm_camera_i2c_data_type {
 	MSM_CAMERA_I2C_SET_WORD_MASK,
 	MSM_CAMERA_I2C_UNSET_WORD_MASK,
 	MSM_CAMERA_I2C_SET_BYTE_WRITE_MASK_DATA,
+	MSM_CAMERA_I2C_BURST_DATA,
 };
 
 enum msm_camera_i2c_cmd_type {
@@ -59,7 +64,8 @@ struct msm_camera_i2c_reg_conf {
 };
 
 struct msm_camera_i2c_conf_array {
-	struct msm_camera_i2c_reg_conf *conf;
+/*	struct msm_camera_i2c_reg_conf *conf;*/
+	void *conf;
 	uint16_t size;
 	uint16_t delay;
 	enum msm_camera_i2c_data_type data_type;
@@ -119,4 +125,7 @@ int32_t msm_sensor_write_enum_conf_array(struct msm_camera_i2c_client *client,
 
 int32_t msm_sensor_write_all_conf_array(struct msm_camera_i2c_client *client,
 	struct msm_camera_i2c_conf_array *array, uint16_t size);
+
+int32_t msm_camera_i2c_write_burst_seq(struct msm_camera_i2c_client *client,
+	uint16_t addr, uint16_t *data, uint16_t num_byte);
 #endif

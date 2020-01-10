@@ -10,6 +10,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #ifndef _MSM_H
 #define _MSM_H
@@ -581,6 +585,7 @@ int msm_cam_register_subdev_node(struct v4l2_subdev *sd,
 uint32_t msm_camera_get_mctl_handle(void);
 struct msm_cam_media_controller *msm_camera_get_mctl(uint32_t handle);
 void msm_camera_free_mctl(uint32_t handle);
+int32_t msm_camera_evt_notify(struct msm_cam_media_controller *pmctl, uint8_t msg_id);
 int msm_server_open_client(int *p_qidx);
 int msm_server_send_ctrl(struct msm_ctrl_cmd *out, int ctrl_id);
 int msm_server_close_client(int idx);

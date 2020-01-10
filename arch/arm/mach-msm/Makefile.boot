@@ -1,3 +1,6 @@
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2012 KYOCERA Corporation
+#
 # MSM7x01A
    zreladdr-$(CONFIG_ARCH_MSM7X01A)	:= 0x10008000
 params_phys-$(CONFIG_ARCH_MSM7X01A)	:= 0x10000100
@@ -38,6 +41,8 @@ endif
 
 # MSM8960
    zreladdr-$(CONFIG_ARCH_MSM8960)	:= 0x80208000
+params_phys-$(CONFIG_ARCH_MSM8960)	:= 0x80200100
+initrd_phys-$(CONFIG_ARCH_MSM8960)	:= 0x84B00000
 
 # MSM8930
    zreladdr-$(CONFIG_ARCH_MSM8930)	:= 0x80208000

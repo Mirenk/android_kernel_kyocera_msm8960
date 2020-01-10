@@ -8,6 +8,11 @@
  * This function is used through-out the kernel (including mm and fs)
  * to indicate a major problem.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2011 KYOCERA Corporation
+ * (C) 2012 KYOCERA Corporation
+ */
 #include <linux/debug_locks.h>
 #include <linux/interrupt.h>
 #include <linux/kmsg_dump.h>
@@ -64,6 +69,7 @@ void __weak panic_smp_self_stop(void)
 		cpu_relax();
 }
 
+extern void set_smem_panic_info_data( const char *pdata );
 /**
  *	panic - halt the system
  *	@fmt: The text string to print
@@ -115,6 +121,8 @@ void panic(const char *fmt, ...)
 		dump_stack();
 #endif
 
+	set_smem_panic_info_data( (const char *)buf );
+
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle
 	 * everything else.
@@ -160,7 +168,8 @@ void panic(const char *fmt, ...)
 		 * shutting down.  But if there is a chance of
 		 * rebooting the system it will be rebooted.
 		 */
-		emergency_restart();
+		printk( KERN_ERR "Kernel panic - exec machine_restart()");
+		machine_restart( "kernel_panic" );
 	}
 #ifdef __sparc__
 	{

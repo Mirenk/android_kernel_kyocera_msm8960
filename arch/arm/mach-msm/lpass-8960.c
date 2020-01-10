@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
@@ -42,6 +46,10 @@ struct lpass_ssr {
 
 static struct lpass_ssr lpass_ssr_8960;
 static int q6_crash_shutdown;
+
+extern void set_smem_crash_system_lpass(void);
+extern void set_smem_crash_kind_wdog_hw(void);
+extern void set_smem_crash_info_data( const char *pdata );
 
 static int riva_notifier_cb(struct notifier_block *this, unsigned long code,
 								void *ss_handle)
@@ -120,6 +128,19 @@ static void lpass_fatal_fn(struct work_struct *work)
 	pr_err("%s %s: Watchdog bite received from Q6!\n", MODULE_NAME,
 		__func__);
 	lpass_log_failure_reason();
+	set_smem_crash_system_lpass();
+	set_smem_crash_kind_wdog_hw();
+	{
+		char buf[33];
+		memset( buf, '\0', sizeof(buf) );
+		snprintf( buf,
+		          sizeof(buf),
+		          "%x,%s",
+		          __LINE__,
+		          __func__
+		);
+		set_smem_crash_info_data( (const char *)buf );
+	}
 	panic(MODULE_NAME ": Resetting the SoC");
 }
 

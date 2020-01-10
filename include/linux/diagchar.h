@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #ifndef DIAGCHAR_SHARED
 #define DIAGCHAR_SHARED
@@ -40,6 +44,7 @@
 #define DIAG_IOCTL_DCI_DEINIT		21
 #define DIAG_IOCTL_DCI_SUPPORT		22
 #define DIAG_IOCTL_DCI_REG		23
+#define DIAG_IOCTL_OEM_KC_01		50
 
 /* PC Tools IDs */
 #define APQ8060_TOOLS_ID	4062

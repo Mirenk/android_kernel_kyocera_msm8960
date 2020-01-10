@@ -1,4 +1,8 @@
 #
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2012 KYOCERA Corporation
+#
+#
 # Makefile for the Linux kernel device drivers.
 #
 # 15 Sep 2000, Christoph Hellwig <hch@infradead.org>
@@ -142,3 +146,11 @@ obj-$(CONFIG_PM_DEVFREQ)	+= devfreq/
 obj-$(CONFIG_MOBICORE_SUPPORT)  += gud/
 
 obj-$(CONFIG_MSM_QDSS)		+= coresight/
+
+obj-y				+= sensors/
+
+obj-y               += sdcarddriver/
+obj-y				+= irda/
+obj-y				+= irda1/
+obj-y				+= irda2/
+obj-y				+= felica/

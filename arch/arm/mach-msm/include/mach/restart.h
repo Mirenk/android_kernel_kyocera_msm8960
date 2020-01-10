@@ -9,6 +9,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
  */
 
 #ifndef _ASM_ARCH_MSM_RESTART_H_
@@ -16,6 +18,7 @@
 
 #define RESTART_NORMAL 0x0
 #define RESTART_DLOAD  0x1
+#define RESTART_OEM    0x2
 
 #if defined(CONFIG_MSM_NATIVE_RESTART)
 void msm_set_restart_mode(int mode);

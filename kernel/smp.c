@@ -1,4 +1,9 @@
 /*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * (C) 2013 KYOCERA Corporation
+ */
+/*
  * Generic helpers for smp ipi calls
  *
  * (C) Jens Axboe <jens.axboe@oracle.com> 2008
@@ -643,8 +648,13 @@ static int __init nrcpus(char *str)
 
 early_param("nr_cpus", nrcpus);
 
+static int boot_mode_charger = 0;
+
 static int __init maxcpus(char *str)
 {
+	if(boot_mode_charger){
+		return 0;
+	}
 	get_option(&str, &setup_max_cpus);
 	if (setup_max_cpus == 0)
 		arch_disable_smp_support();
@@ -653,6 +663,21 @@ static int __init maxcpus(char *str)
 }
 
 early_param("maxcpus", maxcpus);
+
+
+
+static int __init bootmode(char *str)
+{
+	if(str!=NULL){
+		if(strcmp(str,"charger")==0){
+			boot_mode_charger = 1;
+			setup_max_cpus = 0;
+			arch_disable_smp_support();
+		}
+	}
+	return 0;
+}
+early_param("androidboot.mode",bootmode);
 
 /* Setup number of possible processor ids */
 int nr_cpu_ids __read_mostly = NR_CPUS;

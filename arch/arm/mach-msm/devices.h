@@ -13,6 +13,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #ifndef __ARCH_ARM_MACH_MSM_DEVICES_H
 #define __ARCH_ARM_MACH_MSM_DEVICES_H
@@ -56,13 +60,19 @@ extern struct platform_device msm_device_uart_dm6;
 extern struct platform_device msm_device_uart_dm9;
 
 extern struct platform_device msm8960_device_uart_gsbi2;
+extern struct platform_device msm8960_device_uart_gsbi4;
 extern struct platform_device msm8960_device_uart_gsbi5;
 extern struct platform_device msm8960_device_uart_gsbi8;
+extern struct platform_device msm8960_device_uart_gsbi12;
 extern struct platform_device msm8960_device_ssbi_pmic;
+extern struct platform_device msm8960_device_qup_i2c_gsbi2;
 extern struct platform_device msm8960_device_qup_i2c_gsbi3;
 extern struct platform_device msm8960_device_qup_i2c_gsbi4;
-extern struct platform_device msm8960_device_qup_i2c_gsbi9;
+//extern struct platform_device msm8960_device_qup_i2c_gsbi9;
 extern struct platform_device msm8960_device_qup_i2c_gsbi10;
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_KC
+extern struct platform_device msm8960_device_qup_i2c_gsbi11;
+#endif
 extern struct platform_device msm8960_device_qup_i2c_gsbi12;
 extern struct platform_device msm8960_device_qup_spi_gsbi1;
 extern struct platform_device msm8960_gemini_device;

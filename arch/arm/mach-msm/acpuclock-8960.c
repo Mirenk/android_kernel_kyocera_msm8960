@@ -10,6 +10,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2013 KYOCERA Corporation
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -190,10 +194,46 @@ static struct acpu_level acpu_freq_tbl_fast[] __initdata = {
 };
 
 static struct pvs_table pvs_tables[NUM_PVS] __initdata = {
-[PVS_SLOW]    = { acpu_freq_tbl_slow, sizeof(acpu_freq_tbl_slow),     0 },
+[PVS_SLOW]    = { acpu_freq_tbl_slow, sizeof(acpu_freq_tbl_slow), 25000 },
 [PVS_NOMINAL] = { acpu_freq_tbl_nom,  sizeof(acpu_freq_tbl_nom),  25000 },
 [PVS_FAST]    = { acpu_freq_tbl_fast, sizeof(acpu_freq_tbl_fast), 25000 },
 };
+
+static struct acpu_level acpu_freq_tbl_slow_charger[] __initdata = {
+	{ 1, {   384000, PLL_8, 0, 2, 0x00 }, L2(0),   950000 },
+	{ 0, { 0 } }
+};
+
+static struct acpu_level acpu_freq_tbl_nom_charger[] __initdata = {
+	{ 1, {   384000, PLL_8, 0, 2, 0x00 }, L2(0),   900000 },
+	{ 0, { 0 } }
+};
+
+static struct acpu_level acpu_freq_tbl_fast_charger[] __initdata = {
+	{ 1, {   384000, PLL_8, 0, 2, 0x00 }, L2(0),   850000 },
+	{ 0, { 0 } }
+};
+
+static struct pvs_table pvs_tables_charger[NUM_PVS] __initdata = {
+[PVS_SLOW]    = { acpu_freq_tbl_slow_charger, sizeof(acpu_freq_tbl_slow_charger), 25000 },
+[PVS_NOMINAL] = { acpu_freq_tbl_nom_charger,  sizeof(acpu_freq_tbl_nom_charger),  25000 },
+[PVS_FAST]    = { acpu_freq_tbl_fast_charger, sizeof(acpu_freq_tbl_fast_charger), 25000 },
+};
+
+
+static int 	boot_mode_charger = 0;
+static int __init bootmode(char *str)
+{
+	if(str!=NULL){
+		if(strcmp(str,"charger")==0){
+			boot_mode_charger = 1;
+		}
+	}
+	return 0;
+}
+
+early_param("androidboot.mode",bootmode);
+
 
 static struct acpuclk_krait_params acpuclk_8960_params __initdata = {
 	.scalable = scalable,
@@ -207,9 +247,21 @@ static struct acpuclk_krait_params acpuclk_8960_params __initdata = {
 	.stby_khz = 384000,
 };
 
+static struct acpuclk_krait_params acpuclk_8960_params_charger_mode __initdata = {
+	.scalable = scalable,
+	.scalable_size = sizeof(scalable),
+	.hfpll_data = &hfpll_data,
+	.pvs_tables = pvs_tables_charger,
+	.l2_freq_tbl = l2_freq_tbl,
+	.l2_freq_tbl_size = sizeof(l2_freq_tbl),
+	.bus_scale = &bus_scale_data,
+	.qfprom_phys_base = 0x00700000,
+	.stby_khz = 384000,
+};
+
 static int __init acpuclk_8960_probe(struct platform_device *pdev)
 {
-	return acpuclk_krait_init(&pdev->dev, &acpuclk_8960_params);
+	return acpuclk_krait_init(&pdev->dev, boot_mode_charger?(&acpuclk_8960_params_charger_mode):(&acpuclk_8960_params));
 }
 
 static struct platform_driver acpuclk_8960_driver = {

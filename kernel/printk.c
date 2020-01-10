@@ -3,6 +3,9 @@
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
+ *  This software is contributed or developed by KYOCERA Corporation.
+ *  (C) 2012 KYOCERA Corporation
+ *
  * Modified to make sys_syslog() more flexible: added commands to
  * return the last 4k of kernel messages, regardless of whether
  * they've been read or not.  Added option to suppress kernel printk's
@@ -686,9 +689,14 @@ static void call_console_drivers(unsigned start, unsigned end)
 	start_print = start;
 	while (cur_index != end) {
 		if (msg_level < 0 && ((end - cur_index) > 2)) {
-			/* strip log prefix */
-			cur_index += log_prefix(&LOG_BUF(cur_index), &msg_level, NULL);
-			start_print = cur_index;
+			/* do not strip log prefix, just get msg_level
+			 *
+			 * original code:
+			 *
+			 * cur_index += log_prefix(&LOG_BUF(cur_index), &msg_level, NULL);
+			 * start_print = cur_index;
+			 */
+			log_prefix(&LOG_BUF(cur_index), &msg_level, NULL);
 		}
 		while (cur_index != end) {
 			char c = LOG_BUF(cur_index);
@@ -959,6 +967,14 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		}
 	}
 
+	/* Drop a log that do not match console_loglevel */
+	if (current_log_level >= console_loglevel) {
+		printed_len = 0;
+		printk_cpu = UINT_MAX;
+		raw_spin_unlock(&logbuf_lock);
+		goto out_restore_lockdep;
+	}
+
 	/*
 	 * Copy the output into log_buf. If the caller didn't provide
 	 * the appropriate log prefix, we insert them here
@@ -981,6 +997,13 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 				emit_log_char('>');
 				printed_len += 3;
 			}
+
+			/* add cpuid format:"#[0-9*]" */
+			emit_log_char('#');
+			if (printk_cpu < 10)
+				emit_log_char(printk_cpu + '0');
+			else
+				emit_log_char('*');
 
 			if (printk_time) {
 				/* Add the current time stamp */
@@ -1022,6 +1045,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	if (console_trylock_for_printk(this_cpu))
 		console_unlock();
 
+out_restore_lockdep:
 	lockdep_on();
 out_restore_irqs:
 	local_irq_restore(flags);

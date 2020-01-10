@@ -8,6 +8,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
+
 #include <stdarg.h>
 
 #include <linux/export.h>
@@ -319,9 +324,29 @@ void machine_power_off(void)
 		pm_power_off();
 }
 
+extern void set_smem_crash_system_kernel(void);
+extern void set_smem_crash_system_android(void);
+extern void set_smem_crash_kind_panic(void);
+extern void set_smem_crash_kind_android(void);
+extern void set_smem_crash_info_data( const char *pdata );
+extern void set_kcj_crash_info(void);
+
 void machine_restart(char *cmd)
 {
 	machine_shutdown();
+
+	if (cmd != NULL) {
+		if (strcmp(cmd, "kernel_panic") == 0) {
+			set_smem_crash_system_kernel();
+			set_smem_crash_kind_panic();
+			set_smem_crash_info_data( " " );
+		} else if (strcmp(cmd, "system_server_crash") == 0) {
+			set_smem_crash_system_android();
+			set_smem_crash_kind_android();
+			set_smem_crash_info_data( " " );
+		}
+	}
+	set_kcj_crash_info();
 
 	/* Flush the console to make sure all the relevant messages make it
 	 * out to the console drivers */

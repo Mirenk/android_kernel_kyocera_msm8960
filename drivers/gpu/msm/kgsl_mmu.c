@@ -813,8 +813,8 @@ void kgsl_mmu_set_mmutype(char *mmutype)
 		cpu_is_apq8064() ? KGSL_MMU_TYPE_NONE : KGSL_MMU_TYPE_GPU;
 
 	/* Use the IOMMU if it is found */
-	if (iommu_present(&platform_bus_type))
-		kgsl_mmu_type = KGSL_MMU_TYPE_IOMMU;
+	/* if (iommu_present(&platform_bus_type)) */
+	/*	kgsl_mmu_type = KGSL_MMU_TYPE_IOMMU; */
 
 	if (mmutype && !strncmp(mmutype, "gpummu", 6))
 		kgsl_mmu_type = KGSL_MMU_TYPE_GPU;

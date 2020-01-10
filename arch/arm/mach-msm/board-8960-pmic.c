@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * (C) 2013 KYOCERA Corporation
+ */
 
 #include <linux/interrupt.h>
 #include <linux/mfd/pm8xxx/pm8921.h>
@@ -22,6 +27,11 @@
 #include <mach/restart.h>
 #include "devices.h"
 #include "board-8960.h"
+
+#ifdef CONFIG_KEYBOARD_GPIO
+#include <linux/gpio_keys.h>
+#endif
+#include <mach/hs_io_ctl_a.h>
 
 struct pm8xxx_gpio_init {
 	unsigned			gpio;
@@ -96,6 +106,7 @@ struct pm8xxx_mpp_init {
 
 /* Initial PM8921 GPIO configurations */
 static struct pm8xxx_gpio_init pm8921_gpios[] __initdata = {
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	PM8XXX_GPIO_OUTPUT_VIN(6, 1, PM_GPIO_VIN_VPH),	 /* MHL power EN_N */
 	PM8XXX_GPIO_DISABLE(7),				 /* Disable NFC */
 	PM8XXX_GPIO_INPUT(16,	    PM_GPIO_PULL_UP_30), /* SD_CARD_WP */
@@ -110,14 +121,113 @@ static struct pm8xxx_gpio_init pm8921_gpios[] __initdata = {
 	PM8XXX_GPIO_OUTPUT(42, 0),                      /* USB 5V reg enable */
 	/* TABLA CODEC RESET */
 	PM8XXX_GPIO_OUTPUT_STRENGTH(34, 1, PM_GPIO_STRENGTH_MED)
+#else
+	PM8XXX_GPIO_INIT(1, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(2, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(3, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(4, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(5, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(6, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(7, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_VPH, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(8, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(9, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(10, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+
+	PM8XXX_GPIO_INIT(11, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(12, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(13, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(14, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(15, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(16, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(17, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(18, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(19, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(20, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+
+	PM8XXX_GPIO_INIT(21, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(22, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(23, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(24, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_2, 0, 0),
+	PM8XXX_GPIO_INIT(25, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_2, 0, 0),
+	PM8XXX_GPIO_INIT(26, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_2, 0, 0),
+	PM8XXX_GPIO_INIT(27, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_L15, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(28, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(30, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_L15, PM_GPIO_STRENGTH_MED, PM_GPIO_FUNC_PAIRED, 0, 0),
+
+	PM8XXX_GPIO_INIT(31, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(32, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_L17, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_PAIRED, 0, 0),
+	PM8XXX_GPIO_INIT(33, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(34, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(35, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 1, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(36, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(37, PM_GPIO_DIR_OUT, PM_GPIO_OUT_BUF_CMOS, 1, PM_GPIO_PULL_NO, \
+			PM_GPIO_VIN_L17, PM_GPIO_STRENGTH_LOW, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(38, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(40, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+
+	PM8XXX_GPIO_INIT(41, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(42, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_UP_30, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(43, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+	PM8XXX_GPIO_INIT(44, PM_GPIO_DIR_IN, PM_GPIO_OUT_BUF_CMOS, 0, PM_GPIO_PULL_DN, \
+			PM_GPIO_VIN_S4, PM_GPIO_STRENGTH_NO, PM_GPIO_FUNC_NORMAL, 0, 0),
+#endif
 };
 
 /* Initial PM8921 MPP configurations */
 static struct pm8xxx_mpp_init pm8921_mpps[] __initdata = {
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	/* External 5V regulator enable; shared by HDMI and USB_OTG switches. */
 	PM8XXX_MPP_INIT(7, D_INPUT, PM8921_MPP_DIG_LEVEL_VPH, DIN_TO_INT),
 	PM8XXX_MPP_INIT(PM8XXX_AMUX_MPP_8, A_INPUT, PM8XXX_MPP_AIN_AMUX_CH8,
 								DOUT_CTRL_LOW),
+#else
+	PM8XXX_MPP_INIT(1, D_BI_DIR,  PM8XXX_MPP_DIG_LEVEL_VIO_1, BI_PULLUP_30KOHM),
+	PM8XXX_MPP_INIT(2, D_BI_DIR,  PM8XXX_MPP_DIG_LEVEL_VIO_3, BI_PULLUP_30KOHM),
+	PM8XXX_MPP_INIT(3, D_OUTPUT,  PM8XXX_MPP_DIG_LEVEL_VIO_1, DOUT_CTRL_MPP),
+	PM8XXX_MPP_INIT(4, D_INPUT,   PM8XXX_MPP_DIG_LEVEL_VIO_4, DIN_TO_INT),
+	PM8XXX_MPP_INIT(7, A_INPUT,   PM8XXX_MPP_AIN_AMUX_CH7,    DOUT_CTRL_LOW),
+	PM8XXX_MPP_INIT(8, SINK,      PM8XXX_MPP_CS_OUT_5MA,      CS_CTRL_DISABLE),
+#endif
 };
 
 void __init msm8960_pm8921_gpio_mpp_init(void)
@@ -147,7 +257,7 @@ static struct pm8xxx_adc_amux pm8xxx_adc_channels_data[] = {
 	{"vcoin", CHANNEL_VCOIN, CHAN_PATH_SCALING2, AMUX_RSV1,
 		ADC_DECIMATION_TYPE2, ADC_SCALE_DEFAULT},
 	{"vbat", CHANNEL_VBAT, CHAN_PATH_SCALING2, AMUX_RSV1,
-		ADC_DECIMATION_TYPE2, ADC_SCALE_DEFAULT},
+		ADC_DECIMATION_TYPE2, ADC_SCALE_DEFAULT_VBAT},
 	{"dcin", CHANNEL_DCIN, CHAN_PATH_SCALING4, AMUX_RSV1,
 		ADC_DECIMATION_TYPE2, ADC_SCALE_DEFAULT},
 	{"ichg", CHANNEL_ICHG, CHAN_PATH_SCALING1, AMUX_RSV1,
@@ -176,6 +286,12 @@ static struct pm8xxx_adc_amux pm8xxx_adc_channels_data[] = {
 		ADC_DECIMATION_TYPE2, ADC_SCALE_XOTHERM},
 	{"pa_therm0", ADC_MPP_1_AMUX3, CHAN_PATH_SCALING1, AMUX_RSV1,
 		ADC_DECIMATION_TYPE2, ADC_SCALE_PA_THERM},
+	{"camera_therm", ADC_MPP_1_AMUX7, CHAN_PATH_SCALING1, AMUX_RSV1,
+		ADC_DECIMATION_TYPE2, ADC_SCALE_CAMERA_THERM},
+	{"substrate_therm", ADC_MPP_1_AMUX4, CHAN_PATH_SCALING1, AMUX_RSV1,
+		ADC_DECIMATION_TYPE2, ADC_SCALE_CAMERA_THERM},
+	{"oem_vbat", CHANNEL_VBAT, CHAN_PATH_SCALING2, AMUX_RSV1,
+		ADC_DECIMATION_TYPE2, ADC_SCALE_DEFAULT},
 };
 
 static struct pm8xxx_adc_properties pm8xxx_adc_data = {
@@ -405,6 +521,97 @@ static struct pm8xxx_keypad_platform_data keypad_data_sim = {
 	.keymap_data            = &keymap_data_sim,
 };
 
+#ifdef CONFIG_KEYBOARD_GPIO
+static struct gpio_keys_button gpio_keys_buttons[] = {
+	{
+		.code                = KEY_VOLUMEUP,
+		.gpio                = PM_GPIO_16,
+		.desc                = "VOLUME_UP",
+		.active_low          = 1,
+		.type                = EV_KEY,
+		.wakeup              = 1,
+		.debounce_interval   = 20
+	},
+	{
+		.code                = KEY_VOLUMEDOWN,
+		.gpio                = PM_GPIO_17,
+		.desc                = "VOLUME_DOWN",
+		.active_low          = 1,
+		.type                = EV_KEY,
+		.wakeup              = 1,
+		.debounce_interval   = 20
+	},
+	{
+		.code                = KEY_SEND,
+		.gpio                = PM_GPIO_10,
+		.desc                = "TEL",
+		.active_low          = 1,
+		.type                = EV_KEY,
+		.wakeup              = 1,
+		.debounce_interval   = 20
+	},
+	{
+		.code                = KEY_MENU,
+		.gpio                = PM_GPIO_11,
+		.desc                = "MENU",
+		.active_low          = 1,
+		.type                = EV_KEY,
+		.wakeup              = 1,
+		.debounce_interval   = 20
+	},
+	{
+		.code                = KEY_HOME,
+		.gpio                = PM_GPIO_12,
+		.desc                = "HOME",
+		.active_low          = 1,
+		.type                = EV_KEY,
+		.wakeup              = 1,
+		.debounce_interval   = 20
+	},
+	{
+		.code                = KEY_BACK,
+		.gpio                = PM_GPIO_13,
+		.desc                = "BACK",
+		.active_low          = 1,
+		.type                = EV_KEY,
+		.wakeup              = 1,
+		.debounce_interval   = 20
+	},
+	{
+		.code                = KEY_MAIL,
+		.gpio                = PM_GPIO_14,
+		.desc                = "MAIL",
+		.active_low          = 1,
+		.type                = EV_KEY,
+		.wakeup              = 1,
+		.debounce_interval   = 20
+	},
+	{
+		.code                = 248,
+		.gpio                = PM_GPIO_15,
+		.desc                = "CUSTUM",
+		.active_low          = 1,
+		.type                = EV_KEY,
+		.wakeup              = 1,
+		.debounce_interval   = 20
+	},
+};
+
+static struct gpio_keys_platform_data gpio_keys_data = {
+	.buttons        = gpio_keys_buttons,
+	.nbuttons       = ARRAY_SIZE(gpio_keys_buttons),
+	.rep            = 0,
+};
+
+static struct platform_device gpio_keys = {
+	.name           = "gpio-keys",
+	.id             = 0,
+	.dev            = {
+		.platform_data  = &gpio_keys_data,
+	},
+};
+#endif
+
 static int pm8921_therm_mitigation[] = {
 	1100,
 	700,
@@ -412,9 +619,14 @@ static int pm8921_therm_mitigation[] = {
 	325,
 };
 
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 #define MAX_VOLTAGE_MV		4200
+#else
+#define MAX_VOLTAGE_MV		4340
+#endif
 #define CHG_TERM_MA		100
 static struct pm8921_charger_platform_data pm8921_chg_pdata __devinitdata = {
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	.safety_time		= 180,
 	.update_time		= 60000,
 	.max_voltage		= MAX_VOLTAGE_MV,
@@ -433,6 +645,36 @@ static struct pm8921_charger_platform_data pm8921_chg_pdata __devinitdata = {
 	.thermal_mitigation	= pm8921_therm_mitigation,
 	.thermal_levels		= ARRAY_SIZE(pm8921_therm_mitigation),
 	.rconn_mohm		= 18,
+#else
+	.max_bat_chg_current	= 2000,
+	.safety_time		= 512,
+	.ttrkl_time		= 64,
+	.update_time		= 60000,
+	.max_voltage		= MAX_VOLTAGE_MV,
+	.min_voltage		= 3200,
+	.cool_temp		= 10,
+	.warm_temp		= 40,
+	.temp_check_period	= 1,
+	.cool_bat_chg_current	= 1250,
+	.warm_bat_chg_current	= 2000,
+	.cool_bat_voltage	= 4240,
+	.warm_bat_voltage	= 4240,
+	.uvd_thresh_voltage	= 4050,
+	.resume_voltage_delta	= 300,
+	.term_current		= 100,
+	.batt_id_min		= 0,
+	.batt_id_max		= 0,
+	.trkl_voltage		= 2800,
+	.weak_voltage		= 3200,
+	.trkl_current		= 200,
+	.weak_current		= 525,
+	.vin_min		= 4500,
+	.cold_thr		= 1,
+	.hot_thr		= 0,
+	.thermal_mitigation	= pm8921_therm_mitigation,
+	.thermal_levels		= ARRAY_SIZE(pm8921_therm_mitigation),
+	.rconn_mohm		= 18,
+#endif
 };
 
 static struct pm8xxx_misc_platform_data pm8xxx_misc_pdata = {
@@ -440,6 +682,7 @@ static struct pm8xxx_misc_platform_data pm8xxx_misc_pdata = {
 };
 
 static struct pm8921_bms_platform_data pm8921_bms_pdata __devinitdata = {
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 	.battery_type			= BATT_UNKNOWN,
 	.r_sense			= 10,
 	.v_cutoff			= 3400,
@@ -448,6 +691,16 @@ static struct pm8921_bms_platform_data pm8921_bms_pdata __devinitdata = {
 	.shutdown_soc_valid_limit	= 20,
 	.adjust_soc_low_threshold	= 25,
 	.chg_term_ua			= CHG_TERM_MA * 1000,
+#else
+	.battery_type			= BATT_UNKNOWN,
+	.r_sense			= 10,
+	.v_cutoff			= 3400,
+	.max_voltage_uv			= MAX_VOLTAGE_MV * 1000,
+	.rconn_mohm			= 18,
+	.shutdown_soc_valid_limit	= 25,
+	.adjust_soc_low_threshold	= 25,
+	.chg_term_ua			= CHG_TERM_MA * 1000,
+#endif
 };
 
 #define	PM8921_LC_LED_MAX_CURRENT	4	/* I = 4mA */
@@ -573,6 +826,14 @@ static struct pm8xxx_ccadc_platform_data pm8xxx_ccadc_pdata = {
 	.calib_delay_ms		= 600000,
 };
 
+#ifdef CONFIG_PMIC8XXX_VIBRATOR
+struct pm8xxx_vibrator_platform_data pm8xxx_vibrator_pdata = {
+	.initial_vibrate_ms = 0,
+	.max_timeout_ms = 0,
+	.level_mV = 3000,
+};
+#endif
+
 /**
  * PM8XXX_PWM_DTEST_CHANNEL_NONE shall be used when no LPG
  * channel should be in DTEST mode.
@@ -597,6 +858,9 @@ static struct pm8921_platform_data pm8921_platform_data __devinitdata = {
 	.bms_pdata		= &pm8921_bms_pdata,
 	.adc_pdata		= &pm8xxx_adc_pdata,
 	.leds_pdata		= &pm8xxx_leds_pdata,
+#ifdef CONFIG_PMIC8XXX_VIBRATOR
+	.vibrator_pdata		= &pm8xxx_vibrator_pdata,
+#endif
 	.ccadc_pdata		= &pm8xxx_ccadc_pdata,
 	.pwm_pdata		= &pm8xxx_pwm_pdata,
 };
@@ -627,9 +891,15 @@ void __init msm8960_init_pmic(void)
 	} else if (machine_is_msm8960_mtp()) {
 		pm8921_platform_data.bms_pdata->battery_type = BATT_PALLADIUM;
 	} else if (machine_is_msm8960_cdp()) {
+#ifdef QUALCOMM_ORIGINAL_FEATURE
 		pm8921_chg_pdata.has_dc_supply = true;
+#endif
 	}
 
 	if (machine_is_msm8960_fluid())
 		pm8921_bms_pdata.rconn_mohm = 20;
+
+#ifdef CONFIG_KEYBOARD_GPIO
+	platform_device_register(&gpio_keys);
+#endif
 }

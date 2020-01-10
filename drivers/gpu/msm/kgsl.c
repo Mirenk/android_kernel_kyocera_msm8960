@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
+
 #include <linux/module.h>
 #include <linux/fb.h>
 #include <linux/file.h>
@@ -2224,6 +2229,12 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 
 		func = kgsl_ioctl_funcs[nr].func;
 		lock = kgsl_ioctl_funcs[nr].lock;
+		if ((kgsl_ioctl_funcs[nr].cmd & (IOC_IN | IOC_OUT)) && uptr == NULL) {
+			KGSL_DRV_INFO(dev_priv->device,
+					"invalid ioctl cmd flag %08x\n", cmd);
+			ret = -EFAULT;
+			goto done;
+		}
 	} else {
 		func = dev_priv->device->ftbl->ioctl;
 		if (!func) {

@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 /* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -390,7 +394,8 @@ void mdp4_overlay_dmae_cfg(struct msm_fb_data_type *mfd, int atv)
 		MDP_OUTP(MDP_BASE + 0xb3014, 0x1000080);
 		MDP_OUTP(MDP_BASE + 0xb4004, 0x67686970);
 	} else {
-		mdp_vid_quant_set();
+		/* for disable HDMI */
+		/* mdp_vid_quant_set(); */
 	}
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
@@ -1919,7 +1924,7 @@ void mdp4_mixer_blend_setup(int mixer)
 	int i, off, ptype, alpha_drop = 0;
 	int d_alpha, s_alpha;
 	unsigned char *overlay_base;
-	uint32 c0, c1, c2;
+	uint32 c0, c1, c2, base_premulti;
 
 
 	d_pipe = ctrl->stage[mixer][MDP4_MIXER_STAGE_BASE];
@@ -1929,6 +1934,8 @@ void mdp4_mixer_blend_setup(int mixer)
 	}
 
 	blend = &ctrl->blend[mixer][MDP4_MIXER_STAGE0];
+	base_premulti = ctrl->blend[mixer][MDP4_MIXER_STAGE_BASE].op &
+		MDP4_BLEND_FG_ALPHA_BG_CONST;
 	for (i = MDP4_MIXER_STAGE0; i < MDP4_MIXER_STAGE_MAX; i++) {
 		blend->solidfill = 0;
 		blend->op = (MDP4_BLEND_FG_ALPHA_FG_CONST |
@@ -1969,9 +1976,13 @@ void mdp4_mixer_blend_setup(int mixer)
 		} else if (s_alpha) {
 			if (!alpha_drop) {
 				blend->op = MDP4_BLEND_BG_ALPHA_FG_PIXEL;
-				if (!(s_pipe->flags & MDP_BLEND_FG_PREMULT))
+				if ((!(s_pipe->flags & MDP_BLEND_FG_PREMULT)) &&
+						((i != MDP4_MIXER_STAGE0) ||
+							(!base_premulti)))
 					blend->op |=
 						MDP4_BLEND_FG_ALPHA_FG_PIXEL;
+				else
+					blend->fg_alpha = 0xff;
 			} else
 				blend->op = MDP4_BLEND_BG_ALPHA_FG_CONST;
 
@@ -1981,9 +1992,14 @@ void mdp4_mixer_blend_setup(int mixer)
 			if (ptype == OVERLAY_TYPE_VIDEO) {
 				blend->op = (MDP4_BLEND_FG_ALPHA_BG_PIXEL |
 					MDP4_BLEND_FG_INV_ALPHA);
-				if (!(s_pipe->flags & MDP_BLEND_FG_PREMULT))
+				if ((!(s_pipe->flags & MDP_BLEND_FG_PREMULT)) &&
+						((i != MDP4_MIXER_STAGE0) ||
+							(!base_premulti)))
 					blend->op |=
 						MDP4_BLEND_BG_ALPHA_BG_PIXEL;
+				else
+					blend->fg_alpha = 0xff;
+
 				blend->co3_sel = 0; /* use bg alpha */
 			} else {
 				/* s_pipe is rgb without alpha */
@@ -3733,4 +3749,23 @@ int mdp4_v4l2_overlay_play(struct fb_info *info, struct mdp4_overlay_pipe *pipe,
 done:
 	mutex_unlock(&mfd->dma->ov_mutex);
 	return err;
+}
+int mdp4_update_base_blend(struct msm_fb_data_type *mfd,
+			struct mdp_blend_cfg *mdp_blend_cfg)
+{
+	int ret = 0;
+	u32 mixer_num;
+	struct blend_cfg *blend;
+	mixer_num = mdp4_get_mixer_num(mfd->panel_info.type);
+	if (!ctrl)
+		return -EPERM;
+	blend = &ctrl->blend[mixer_num][MDP4_MIXER_STAGE_BASE];
+	if (mdp_blend_cfg->is_premultiplied) {
+		blend->bg_alpha = 0xFF;
+		blend->op = MDP4_BLEND_FG_ALPHA_BG_CONST;
+	} else {
+		blend->op = MDP4_BLEND_FG_ALPHA_FG_PIXEL;
+		blend->bg_alpha = 0;
+	}
+	return ret;
 }

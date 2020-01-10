@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -627,8 +631,8 @@ void mdp_refresh_screen(unsigned long data)
 		mfd->refresh_timer.data = data;
 
 		if (mfd->dma->busy)
-			/* come back in 1 msec */
-			mfd->refresh_timer.expires = jiffies + (HZ / 1000);
+			/* come back in 20 msec */
+			mfd->refresh_timer.expires = jiffies + (20 * HZ / 1000);
 		else
 			mfd->refresh_timer.expires =
 			    jiffies + mfd->refresh_timer_duration;

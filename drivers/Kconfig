@@ -1,3 +1,8 @@
+#
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2012 KYOCERA Corporation
+#
+
 menu "Device Drivers"
 
 source "drivers/base/Kconfig"
@@ -149,5 +154,7 @@ source "drivers/devfreq/Kconfig"
 source "drivers/gud/Kconfig"
 
 source "drivers/coresight/Kconfig"
+
+source "drivers/sensors/Kconfig"
 
 endmenu

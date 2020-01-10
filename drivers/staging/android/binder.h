@@ -6,6 +6,9 @@
  *
  * Copyright (c) 2005 Palmsource, Inc.
  *
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -326,5 +329,6 @@ enum BinderDriverCommandProtocol {
 	 */
 };
 
+const char *binder_get_ioctl_name(int cmd);
 #endif /* _LINUX_BINDER_H */
 

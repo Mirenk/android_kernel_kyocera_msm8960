@@ -1,3 +1,7 @@
+#
+# This software is contributed or developed by KYOCERA Corporation.
+# (C) 2012 KYOCERA Corporation
+#
 ccflags-$(CONFIG_POWER_SUPPLY_DEBUG) := -DDEBUG
 
 power_supply-y				:= power_supply_core.o
@@ -55,6 +59,6 @@ obj-$(CONFIG_BATTERY_BQ27541)	+= bq27541_fuelgauger.o
 obj-$(CONFIG_SMB137B_CHARGER)   += smb137b.o
 obj-$(CONFIG_PM8XXX_CCADC)	+= pm8xxx-ccadc.o
 obj-$(CONFIG_PM8921_BMS)	+= pm8921-bms.o
-obj-$(CONFIG_PM8921_CHARGER)	+= pm8921-charger.o
+obj-$(CONFIG_PM8921_CHARGER)	+= pm8921-charger.o pm8921-charger_oem.o
 obj-$(CONFIG_LTC4088_CHARGER)	+= ltc4088-charger.o
 obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o

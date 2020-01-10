@@ -13,6 +13,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ *This software is contributed or developed by KYOCERA Corporation.
+ *(C) 2012 KYOCERA Corporation
+ */
 
 /* Acknowledgements:
  * This file is based on msm_serial.c, originally
@@ -47,6 +51,21 @@
 #include <mach/msm_serial_hs_lite.h>
 #include <asm/mach-types.h>
 #include "msm_serial_hs_hwreg.h"
+
+#ifdef FEATURE_KC_UART_WRITE_SYNC2
+static const char device_name_hsl2[64] = {0x74, 0x74, 0x79, 0x48, 0x53, 0x4C, 0x32};
+volatile uart_trans_sync_c uart_trans_sync_hsl2;
+#endif /* FEATURE_KC_UART_WRITE_SYNC2 */
+#ifdef FEATURE_KC_UART_WRITE_SYNC4
+static const char device_name_hsl4[64] = {0x74, 0x74, 0x79, 0x48, 0x53, 0x4C, 0x34};
+volatile uart_trans_sync_c uart_trans_sync_hsl4;
+#endif /* FEATURE_KC_UART_WRITE_SYNC4 */
+
+enum {
+	UART_CLOSE_ST,
+	UART_OPEN_ST,
+};
+extern unsigned int uart_open_status;
 
 struct msm_hsl_port {
 	struct uart_port	uart;
@@ -271,6 +290,24 @@ static void msm_hsl_stop_tx(struct uart_port *port)
 	msm_hsl_port->imr &= ~UARTDM_ISR_TXLEV_BMSK;
 	msm_hsl_write(port, msm_hsl_port->imr,
 		regmap[msm_hsl_port->ver_id][UARTDM_IMR]);
+
+#ifdef FEATURE_KC_UART_WRITE_SYNC2
+	if (strcmp(port->state->port.tty->name , device_name_hsl2) == 0)
+	{
+		uart_trans_sync_hsl2 = TRANS_OFF;
+
+		uart_stop_tx_hsl2();
+	}
+#endif /* FEATURE_KC_UART_WRITE_SYNC2 */
+#ifdef FEATURE_KC_UART_WRITE_SYNC4
+	if (strcmp(port->state->port.tty->name , device_name_hsl4) == 0)
+	{
+		uart_trans_sync_hsl4 = TRANS_OFF;
+
+		uart_stop_tx_hsl4();
+	}
+#endif /* FEATURE_KC_UART_WRITE_SYNC4 */
+
 }
 
 static void msm_hsl_start_tx(struct uart_port *port)
@@ -503,6 +540,19 @@ static unsigned int msm_hsl_tx_empty(struct uart_port *port)
 	       UARTDM_SR_TXEMT_BMSK) ? TIOCSER_TEMT : 0;
 	return ret;
 }
+
+#ifdef FEATURE_KC_UART_WRITE_SYNC
+static unsigned int msm_hsl_tx_empty_hsl_k(struct uart_port *port)
+{
+	unsigned int vid = UART_TO_MSM(port)->ver_id;
+	unsigned int ret;
+
+	ret = (msm_hsl_read(port, regmap[vid][UARTDM_SR]) &
+	       UARTDM_SR_TXEMT_BMSK) ? TIOCSER_TEMT : 0;
+
+	return ret;
+}
+#endif /* FEATURE_KC_UART_WRITE_SYNC */
 
 static void msm_hsl_reset(struct uart_port *port)
 {
@@ -1015,6 +1065,9 @@ static void msm_hsl_power(struct uart_port *port, unsigned int state,
 
 static struct uart_ops msm_hsl_uart_pops = {
 	.tx_empty = msm_hsl_tx_empty,
+#ifdef FEATURE_KC_UART_WRITE_SYNC
+	.tx_empty_hsl_k = msm_hsl_tx_empty_hsl_k,
+#endif /* FEATURE_KC_UART_WRITE_SYNC */
 	.set_mctrl = msm_hsl_set_mctrl,
 	.get_mctrl = msm_hsl_get_mctrl,
 	.stop_tx = msm_hsl_stop_tx,
@@ -1061,6 +1114,42 @@ static struct msm_hsl_port msm_hsl_uart_ports[] = {
 			.line = 2,
 		},
 	},
+	{
+		.uart = {
+			.iotype = UPIO_MEM,
+			.ops = &msm_hsl_uart_pops,
+			.flags = UPF_BOOT_AUTOCONF,
+			.fifosize = 64,
+			.line = 3,
+		},
+	},
+	{
+		.uart = {
+			.iotype = UPIO_MEM,
+			.ops = &msm_hsl_uart_pops,
+			.flags = UPF_BOOT_AUTOCONF,
+			.fifosize = 64,
+			.line = 4,
+		},
+	},
+	{
+		.uart = {
+			.iotype = UPIO_MEM,
+			.ops = &msm_hsl_uart_pops,
+			.flags = UPF_BOOT_AUTOCONF,
+			.fifosize = 64,
+			.line = 5,
+		},
+	},
+	{
+		.uart = {
+			.iotype = UPIO_MEM,
+			.ops = &msm_hsl_uart_pops,
+			.flags = UPF_BOOT_AUTOCONF,
+			.fifosize = 64,
+			.line = 6,
+		},
+	},
 };
 
 #define UART_NR	ARRAY_SIZE(msm_hsl_uart_ports)
@@ -1070,13 +1159,19 @@ static inline struct uart_port *get_port_from_line(unsigned int line)
 	return &msm_hsl_uart_ports[line].uart;
 }
 
+#ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 static unsigned int msm_hsl_console_state[8];
+#endif
 
 static void dump_hsl_regs(struct uart_port *port)
 {
 	struct msm_hsl_port *msm_hsl_port = UART_TO_MSM(port);
 	unsigned int vid = msm_hsl_port->ver_id;
+#ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 	unsigned int sr, isr, mr1, mr2, ncf, txfs, rxfs, con_state;
+#else
+	unsigned int sr, isr, mr1, mr2, ncf, txfs, rxfs;
+#endif
 
 	sr = msm_hsl_read(port, regmap[vid][UARTDM_SR]);
 	isr = msm_hsl_read(port, regmap[vid][UARTDM_ISR]);
@@ -1085,8 +1180,11 @@ static void dump_hsl_regs(struct uart_port *port)
 	ncf = msm_hsl_read(port, regmap[vid][UARTDM_NCF_TX]);
 	txfs = msm_hsl_read(port, regmap[vid][UARTDM_TXFS]);
 	rxfs = msm_hsl_read(port, regmap[vid][UARTDM_RXFS]);
+#ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 	con_state = get_console_state(port);
+#endif
 
+#ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 	msm_hsl_console_state[0] = sr;
 	msm_hsl_console_state[1] = isr;
 	msm_hsl_console_state[2] = mr1;
@@ -1095,6 +1193,7 @@ static void dump_hsl_regs(struct uart_port *port)
 	msm_hsl_console_state[5] = txfs;
 	msm_hsl_console_state[6] = rxfs;
 	msm_hsl_console_state[7] = con_state;
+#endif
 
 	pr_info("%s(): Timeout: %d uS\n", __func__, msm_hsl_port->tx_timeout);
 	pr_info("%s(): SR:  %08x\n", __func__, sr);
@@ -1104,7 +1203,9 @@ static void dump_hsl_regs(struct uart_port *port)
 	pr_info("%s(): NCF: %08x\n", __func__, ncf);
 	pr_info("%s(): TXFS: %08x\n", __func__, txfs);
 	pr_info("%s(): RXFS: %08x\n", __func__, rxfs);
+#ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 	pr_info("%s(): Console state: %d\n", __func__, con_state);
+#endif
 }
 
 /*
@@ -1562,6 +1663,8 @@ static int __init msm_serial_hsl_init(void)
 		uart_unregister_driver(&msm_hsl_uart_driver);
 
 	printk(KERN_INFO "msm_serial_hsl: driver initialized\n");
+
+	uart_open_status = UART_CLOSE_ST;
 
 	return ret;
 }

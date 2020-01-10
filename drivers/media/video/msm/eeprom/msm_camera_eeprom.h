@@ -9,6 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 #ifndef MSM_CAMERA_EEPROM_H
 #define MSM_CAMERA_EEPROM_H
 
@@ -68,6 +72,7 @@ struct msm_eeprom_ctrl_t {
 	uint16_t data_tbl_size;
 };
 
+int32_t msm_eeprom_evt_notify(struct msm_eeprom_ctrl_t *eclient, uint8_t msg_id);
 int32_t msm_camera_eeprom_get_data(struct msm_eeprom_ctrl_t *ectrl,
 	struct msm_eeprom_data_t *edata);
 int32_t msm_camera_eeprom_get_info(struct msm_eeprom_ctrl_t *ectrl,

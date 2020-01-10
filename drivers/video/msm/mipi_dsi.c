@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -100,7 +104,9 @@ static int mipi_dsi_off(struct platform_device *pdev)
 				if (MDP_REV_303 != mdp_rev)
 					gpio_free(vsync_gpio);
 			}
+#ifndef CONFIG_FB_MSM_MIPI_DSI_RENESAS_CM
 			mipi_dsi_set_tear_off(mfd);
+#endif
 		}
 	}
 
@@ -308,7 +314,9 @@ static int mipi_dsi_on(struct platform_device *pdev)
 					}
 				}
 			}
+#ifndef CONFIG_FB_MSM_MIPI_DSI_RENESAS_CM
 			mipi_dsi_set_tear_on(mfd);
+#endif
 		}
 		mipi_dsi_clk_disable();
 		mipi_dsi_ahb_ctrl(0);
@@ -421,6 +429,7 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 		if (mipi_dsi_clk_init(pdev))
 			return -EPERM;
 
+#if 0
 		if (mipi_dsi_pdata->splash_is_enabled &&
 			!mipi_dsi_pdata->splash_is_enabled()) {
 			mipi_dsi_ahb_ctrl(1);
@@ -429,6 +438,7 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 			MIPI_OUTP(MIPI_DSI_BASE + 0x200, 0);
 			mipi_dsi_ahb_ctrl(0);
 		}
+#endif
 		mipi_dsi_resource_initialized = 1;
 
 		return 0;

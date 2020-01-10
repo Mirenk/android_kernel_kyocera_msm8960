@@ -1,3 +1,7 @@
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -35,6 +39,7 @@
 #include <linux/gpio.h>
 #include "wcd9310.h"
 
+#include <linux/key_dm_driver.h>
 static int cfilt_adjust_ms = 10;
 module_param(cfilt_adjust_ms, int, 0644);
 MODULE_PARM_DESC(cfilt_adjust_ms, "delay after adjusting cfilt voltage in ms");
@@ -251,6 +256,23 @@ struct hpf_work {
 
 static struct hpf_work tx_hpf_work[NUM_DECIMATORS];
 
+#define TABLA_HS_DET_READ_CNT 4
+#define TABLA_HS_PLUG_TYPE_CNT 4
+#define TABLA_HS_POLLING_CNT 2
+
+enum tabla_hs_det_state {
+	HS_DET_STATE_REMOVE,
+	HS_DET_STATE_INSERT
+};
+
+struct tabla_hs_det_proc_state {
+	struct tabla_hs_det_proc_state *next;
+	void (*state_enter)(struct snd_soc_codec *);
+	void (*state_exit)(struct snd_soc_codec *);
+	void (*on_gpio_irq)(struct snd_soc_codec *);
+	void (*on_timeout)(struct snd_soc_codec *);
+};
+
 struct tabla_priv {
 	struct snd_soc_codec *codec;
 	struct tabla_reg_address reg_addr;
@@ -343,6 +365,20 @@ struct tabla_priv {
 	struct dentry *debugfs_poke;
 	struct dentry *debugfs_mbhc;
 #endif
+
+	struct tabla_hs_det_proc_state *hs_det_proc_state;
+
+	struct hrtimer hs_det_timer;
+	struct hrtimer hs_plug_type_rejudge_timer;
+
+	struct work_struct hs_det_proc_work;
+
+	enum tabla_hs_det_state hs_det_state;
+	bool hs_btn_press_flg;
+
+	char hs_det_gpio_read_cnt;
+	char hs_sw_gpio_read_cnt;
+
 };
 
 static const u32 comp_shift[] = {
@@ -408,6 +444,8 @@ static unsigned short tx_digital_gain_reg[] = {
 	TABLA_A_CDC_TX9_VOL_CTL_GAIN,
 	TABLA_A_CDC_TX10_VOL_CTL_GAIN,
 };
+
+bool g_tabla_sw_prlling_flg;
 
 static int tabla_codec_enable_charge_pump(struct snd_soc_dapm_widget *w,
 		struct snd_kcontrol *kcontrol, int event)
@@ -2432,6 +2470,7 @@ static void tabla_turn_onoff_override(struct snd_soc_codec *codec, bool on)
 	snd_soc_update_bits(codec, TABLA_A_CDC_MBHC_B1_CTL, 0x04, on << 2);
 }
 
+#if 0
 /* called under codec_resource_lock acquisition */
 static void tabla_codec_drive_v_to_micbias(struct snd_soc_codec *codec,
 					   int usec)
@@ -2461,6 +2500,7 @@ static void tabla_codec_drive_v_to_micbias(struct snd_soc_codec *codec,
 		tabla_turn_onoff_override(codec, false);
 	}
 }
+#endif
 
 /* called under codec_resource_lock acquisition */
 static void __tabla_codec_switch_micbias(struct snd_soc_codec *codec,
@@ -2864,9 +2904,11 @@ static int tabla_hphr_dac_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+		usleep_range(5000, 5000);
 		snd_soc_update_bits(codec, w->reg, 0x40, 0x40);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
+		usleep_range(5000, 5000);
 		snd_soc_update_bits(codec, w->reg, 0x40, 0x00);
 		break;
 	}
@@ -2877,8 +2919,10 @@ static void tabla_snd_soc_jack_report(struct tabla_priv *tabla,
 				      struct snd_soc_jack *jack, int status,
 				      int mask)
 {
+#if 0
 	/* XXX: wake_lock_timeout()? */
 	snd_soc_jack_report_no_dapm(jack, status, mask);
+#endif
 }
 
 static void hphocp_off_report(struct tabla_priv *tabla,
@@ -3812,6 +3856,7 @@ int tabla_mclk_enable(struct snd_soc_codec *codec, int mclk_enable, bool dapm)
 	if (mclk_enable) {
 		tabla->mclk_enabled = true;
 
+#if 0
 		if (tabla->mbhc_polling_active) {
 			tabla_codec_pause_hs_polling(codec);
 			tabla_codec_disable_clock_block(codec);
@@ -3821,11 +3866,14 @@ int tabla_mclk_enable(struct snd_soc_codec *codec, int mclk_enable, bool dapm)
 			tabla_codec_calibrate_hs_polling(codec);
 			tabla_codec_start_hs_polling(codec);
 		} else {
+#endif
 			tabla_codec_disable_clock_block(codec);
 			tabla_codec_enable_bandgap(codec,
 						   TABLA_BANDGAP_AUDIO_MODE);
 			tabla_codec_enable_clock_block(codec, 0);
+#if 0
 		}
+#endif
 	} else {
 
 		if (!tabla->mclk_enabled) {
@@ -3837,6 +3885,7 @@ int tabla_mclk_enable(struct snd_soc_codec *codec, int mclk_enable, bool dapm)
 		tabla->mclk_enabled = false;
 
 		if (tabla->mbhc_polling_active) {
+#if 0
 			tabla_codec_pause_hs_polling(codec);
 			tabla_codec_disable_clock_block(codec);
 			tabla_codec_enable_bandgap(codec,
@@ -3847,6 +3896,12 @@ int tabla_mclk_enable(struct snd_soc_codec *codec, int mclk_enable, bool dapm)
 			tabla_codec_start_hs_polling(codec);
 			snd_soc_update_bits(codec, TABLA_A_CLK_BUFF_EN1,
 					0x05, 0x01);
+#else
+			tabla_codec_disable_clock_block(codec);
+			tabla_codec_enable_bandgap(codec,
+						   TABLA_BANDGAP_MBHC_MODE);
+			tabla_codec_enable_clock_block(codec, 1);
+#endif
 		} else {
 			tabla_codec_disable_clock_block(codec);
 			tabla_codec_enable_bandgap(codec,
@@ -5148,11 +5203,13 @@ static short __tabla_codec_sta_dce(struct snd_soc_codec *codec, int dce,
 	return bias_value;
 }
 
+#if 0
 static short tabla_codec_sta_dce(struct snd_soc_codec *codec, int dce,
 				 bool norel)
 {
 	return __tabla_codec_sta_dce(codec, dce, false, norel);
 }
+#endif
 
 /* called only from interrupt which is under codec_resource_lock acquisition */
 static short tabla_codec_setup_hs_polling(struct snd_soc_codec *codec)
@@ -5928,6 +5985,7 @@ static bool tabla_mbhc_fw_validate(const struct firmware *fw)
 	return true;
 }
 
+#if 0
 /* called under codec_resource_lock acquisition */
 static int tabla_determine_button(const struct tabla_priv *priv,
 				  const s32 micmv)
@@ -5954,7 +6012,9 @@ static int tabla_determine_button(const struct tabla_priv *priv,
 
 	return btn;
 }
+#endif
 
+#if 0
 static int tabla_get_button_mask(const int btn)
 {
 	int mask = 0;
@@ -5986,7 +6046,9 @@ static int tabla_get_button_mask(const int btn)
 	}
 	return mask;
 }
+#endif
 
+#if 0
 static irqreturn_t tabla_dce_handler(int irq, void *data)
 {
 	int i, mask;
@@ -6116,7 +6178,9 @@ static irqreturn_t tabla_dce_handler(int irq, void *data)
 	TABLA_RELEASE_LOCK(priv->codec_resource_lock);
 	return IRQ_HANDLED;
 }
+#endif
 
+#if 0
 static int tabla_is_fake_press(struct tabla_priv *priv)
 {
 	int i;
@@ -6153,7 +6217,9 @@ static int tabla_is_fake_press(struct tabla_priv *priv)
 
 	return r;
 }
+#endif
 
+#if 0
 static irqreturn_t tabla_release_handler(int irq, void *data)
 {
 	int ret;
@@ -6213,6 +6279,7 @@ static irqreturn_t tabla_release_handler(int irq, void *data)
 	TABLA_RELEASE_LOCK(priv->codec_resource_lock);
 	return IRQ_HANDLED;
 }
+#endif
 
 static void tabla_codec_shutdown_hs_removal_detect(struct snd_soc_codec *codec)
 {
@@ -6253,6 +6320,7 @@ static void tabla_codec_cleanup_hs_polling(struct snd_soc_codec *codec)
 	tabla->mbhc_state = MBHC_STATE_NONE;
 }
 
+#if 0
 static irqreturn_t tabla_hphl_ocp_irq(int irq, void *data)
 {
 	struct tabla_priv *tabla = data;
@@ -6285,7 +6353,9 @@ static irqreturn_t tabla_hphl_ocp_irq(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
+#endif
 
+#if 0
 static irqreturn_t tabla_hphr_ocp_irq(int irq, void *data)
 {
 	struct tabla_priv *tabla = data;
@@ -6318,6 +6388,7 @@ static irqreturn_t tabla_hphr_ocp_irq(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
+#endif
 
 static bool tabla_is_inval_ins_range(struct snd_soc_codec *codec,
 				     s32 mic_volt, bool highhph, bool *highv)
@@ -6755,6 +6826,7 @@ static void tabla_codec_detect_plug_type(struct snd_soc_codec *codec)
 	}
 }
 
+#if 0
 /* called only from interrupt which is under codec_resource_lock acquisition */
 static void tabla_hs_insert_irq_gpio(struct tabla_priv *priv, bool is_removal)
 {
@@ -6783,7 +6855,9 @@ static void tabla_hs_insert_irq_gpio(struct tabla_priv *priv, bool is_removal)
 		pr_err("%s: GPIO used, invalid MBHC Removal\n", __func__);
 	}
 }
+#endif
 
+#if 0
 /* called only from interrupt which is under codec_resource_lock acquisition */
 static void tabla_hs_insert_irq_nogpio(struct tabla_priv *priv, bool is_removal,
 				       bool is_mb_trigger)
@@ -6843,7 +6917,9 @@ static void tabla_hs_insert_irq_nogpio(struct tabla_priv *priv, bool is_removal,
 		}
 	}
 }
+#endif
 
+#if 0
 static irqreturn_t tabla_hs_insert_irq(int irq, void *data)
 {
 	bool is_mb_trigger, is_removal;
@@ -6872,7 +6948,9 @@ static irqreturn_t tabla_hs_insert_irq(int irq, void *data)
 	TABLA_RELEASE_LOCK(priv->codec_resource_lock);
 	return IRQ_HANDLED;
 }
+#endif
 
+#if 0
 static bool is_valid_mic_voltage(struct snd_soc_codec *codec, s32 mic_mv)
 {
 	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
@@ -6883,7 +6961,9 @@ static bool is_valid_mic_voltage(struct snd_soc_codec *codec, s32 mic_mv)
 	return (!(mic_mv > 10 && mic_mv < 80) && (mic_mv > plug_type->v_no_mic)
 		&& (mic_mv < v_hs_max)) ? true : false;
 }
+#endif
 
+#if 0
 /* called under codec_resource_lock acquisition
  * returns true if mic voltage range is back to normal insertion
  * returns false either if timedout or removed */
@@ -6963,7 +7043,9 @@ static bool tabla_hs_remove_settle(struct snd_soc_codec *codec)
 			 __func__, TABLA_HS_DETECT_PLUG_TIME_MS);
 	return settled;
 }
+#endif
 
+#if 0
 /* called only from interrupt which is under codec_resource_lock acquisition */
 static void tabla_hs_remove_irq_gpio(struct tabla_priv *priv)
 {
@@ -6973,7 +7055,9 @@ static void tabla_hs_remove_irq_gpio(struct tabla_priv *priv)
 		tabla_codec_start_hs_polling(codec);
 	pr_debug("%s: remove settle done\n", __func__);
 }
+#endif
 
+#if 0
 /* called only from interrupt which is under codec_resource_lock acquisition */
 static void tabla_hs_remove_irq_nogpio(struct tabla_priv *priv)
 {
@@ -7031,7 +7115,9 @@ static void tabla_hs_remove_irq_nogpio(struct tabla_priv *priv)
 		tabla_codec_start_hs_polling(codec);
 	}
 }
+#endif
 
+#if 0
 static irqreturn_t tabla_hs_remove_irq(int irq, void *data)
 {
 	struct tabla_priv *priv = data;
@@ -7058,6 +7144,7 @@ static irqreturn_t tabla_hs_remove_irq(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
+#endif
 
 void mbhc_insert_work(struct work_struct *work)
 {
@@ -7939,6 +8026,7 @@ static int tabla_codec_probe(struct snd_soc_codec *codec)
 	tabla->clock_active = false;
 	tabla->config_mode_active = false;
 	tabla->mbhc_polling_active = false;
+	g_tabla_sw_prlling_flg = false;
 	tabla->mbhc_fake_ins_start = 0;
 	tabla->no_mic_headset_override = false;
 	tabla->hs_polling_irq_prepared = false;
@@ -8011,6 +8099,7 @@ static int tabla_codec_probe(struct snd_soc_codec *codec)
 
 	snd_soc_dapm_sync(dapm);
 
+#if 0
 	ret = wcd9xxx_request_irq(codec->control_data, TABLA_IRQ_MBHC_INSERTION,
 		tabla_hs_insert_irq, "Headset insert detect", tabla);
 	if (ret) {
@@ -8043,6 +8132,7 @@ static int tabla_codec_probe(struct snd_soc_codec *codec)
 			TABLA_IRQ_MBHC_RELEASE);
 		goto err_release_irq;
 	}
+#endif
 
 	ret = wcd9xxx_request_irq(codec->control_data, TABLA_IRQ_SLIMBUS,
 		tabla_slimbus_irq, "SLIMBUS Slave", tabla);
@@ -8056,6 +8146,7 @@ static int tabla_codec_probe(struct snd_soc_codec *codec)
 		wcd9xxx_interface_reg_write(codec->control_data,
 			TABLA_SLIM_PGD_PORT_INT_EN0 + i, 0xFF);
 
+#if 0
 	ret = wcd9xxx_request_irq(codec->control_data,
 		TABLA_IRQ_HPH_PA_OCPL_FAULT, tabla_hphl_ocp_irq,
 		"HPH_L OCP detect", tabla);
@@ -8075,6 +8166,8 @@ static int tabla_codec_probe(struct snd_soc_codec *codec)
 		goto err_hphr_ocp_irq;
 	}
 	wcd9xxx_disable_irq(codec->control_data, TABLA_IRQ_HPH_PA_OCPR_FAULT);
+#endif
+
 	for (i = 0; i < ARRAY_SIZE(tabla_dai); i++) {
 		switch (tabla_dai[i].id) {
 		case AIF1_PB:
@@ -8116,12 +8209,15 @@ static int tabla_codec_probe(struct snd_soc_codec *codec)
 	codec->ignore_pmdown_time = 1;
 	return ret;
 
+#if 0
 err_hphr_ocp_irq:
 	wcd9xxx_free_irq(codec->control_data,
 			TABLA_IRQ_HPH_PA_OCPL_FAULT, tabla);
 err_hphl_ocp_irq:
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_SLIMBUS, tabla);
+#endif
 err_slimbus_irq:
+#if 0
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_MBHC_RELEASE, tabla);
 err_release_irq:
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_MBHC_POTENTIAL, tabla);
@@ -8130,6 +8226,7 @@ err_potential_irq:
 err_remove_irq:
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_MBHC_INSERTION, tabla);
 err_insert_irq:
+#endif
 err_pdata:
 	mutex_destroy(&tabla->codec_resource_lock);
 	kfree(tabla);
@@ -8140,10 +8237,12 @@ static int tabla_codec_remove(struct snd_soc_codec *codec)
 	int i;
 	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_SLIMBUS, tabla);
+#if 0
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_MBHC_RELEASE, tabla);
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_MBHC_POTENTIAL, tabla);
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_MBHC_REMOVAL, tabla);
 	wcd9xxx_free_irq(codec->control_data, TABLA_IRQ_MBHC_INSERTION, tabla);
+#endif
 	TABLA_ACQUIRE_LOCK(tabla->codec_resource_lock);
 	tabla_codec_disable_clock_block(codec);
 	TABLA_RELEASE_LOCK(tabla->codec_resource_lock);
@@ -8157,6 +8256,7 @@ static int tabla_codec_remove(struct snd_soc_codec *codec)
 	debugfs_remove(tabla->debugfs_poke);
 	debugfs_remove(tabla->debugfs_mbhc);
 #endif
+	cancel_work_sync(&tabla->hs_det_proc_work);
 	kfree(tabla);
 	return 0;
 }
@@ -8257,6 +8357,612 @@ static void __exit tabla_codec_exit(void)
 {
 	platform_driver_unregister(&tabla1x_codec_driver);
 	platform_driver_unregister(&tabla_codec_driver);
+}
+
+static struct tabla_hs_det_proc_state* tabla_set_hs_det_proc_state(struct snd_soc_codec *codec, struct tabla_hs_det_proc_state *state);
+static void tabla_jack_detect_push_state(struct snd_soc_codec *codec, struct tabla_hs_det_proc_state *state);
+static struct tabla_hs_det_proc_state* tabla_jack_detect_pop_state(struct snd_soc_codec *codec);
+static irqreturn_t tabla_jack_detect_on_gpio_irq(int irq, void *data);
+static void tabla_jack_detect_on_timer(struct snd_soc_codec *codec);
+static void tabla_hs_det_proc_state_init_enter(struct snd_soc_codec *codec);
+static void tabla_hs_det_proc_state_polling_enter(struct snd_soc_codec *codec);
+static void tabla_hs_det_proc_state_polling_on_timeout(struct snd_soc_codec *codec);
+static void tabla_hs_det_proc_state_remove_enter(struct snd_soc_codec *codec);
+static void tabla_hs_det_proc_state_remove_on_gpio_irq(struct snd_soc_codec *codec);
+static void tabla_hs_det_proc_state_insert_enter(struct snd_soc_codec *codec);
+static void tabla_hs_det_proc_state_insert_exit(struct snd_soc_codec *codec);
+static void tabla_hs_det_proc_state_insert_on_gpio_irq(struct snd_soc_codec *codec);
+static void tabla_hs_btn_det_proc_state_init_on_gpio_irq(struct snd_soc_codec *codec);
+static void tabla_hs_btn_det_proc_state_init_on_timeout(struct snd_soc_codec *codec);
+static void tabla_hs_btn_det_proc_state_3pinouts_enter(struct snd_soc_codec *codec);
+static void tabla_hs_btn_det_proc_state_3pinouts_on_gpio_irq(struct snd_soc_codec *codec);
+static void tabla_hs_btn_det_proc_state_3pinouts_on_timeout(struct snd_soc_codec *codec);
+static void tabla_hs_btn_det_proc_state_4pinouts_enter(struct snd_soc_codec *codec);
+static void tabla_hs_btn_det_proc_state_4pinouts_on_gpio_irq(struct snd_soc_codec *codec);
+static void tabla_hs_btn_det_proc_state_4pinouts_on_timeout(struct snd_soc_codec *codec);
+static void tabla_hs_det_set_timer(struct snd_soc_codec *codec);
+static enum hrtimer_restart tabla_hs_det_timer_cb(struct hrtimer *hrtimer);
+static enum hrtimer_restart tabla_hs_plug_type_rejudge_timer_cb(struct hrtimer *hrtimer);
+static void tabla_hs_det_proc_work(struct work_struct *work);
+static int tabla_hs_sw_gpio_get_value(struct snd_soc_codec *codec);
+static void tabla_hs_polling_off(struct snd_soc_codec *codec);
+
+static struct tabla_hs_det_proc_state hs_det_proc_state_init =
+{
+	.state_enter	= tabla_hs_det_proc_state_init_enter,
+	.state_exit		= NULL,
+	.on_gpio_irq	= NULL,
+	.on_timeout		= NULL,
+};
+
+static struct tabla_hs_det_proc_state hs_det_proc_state_polling =
+{
+	.state_enter	= tabla_hs_det_proc_state_polling_enter,
+	.state_exit		= NULL,
+	.on_gpio_irq	= NULL,
+	.on_timeout		= tabla_hs_det_proc_state_polling_on_timeout,
+};
+
+static struct tabla_hs_det_proc_state hs_det_proc_state_remove =
+{
+	.state_enter	= tabla_hs_det_proc_state_remove_enter,
+	.state_exit		= NULL,
+	.on_gpio_irq	= tabla_hs_det_proc_state_remove_on_gpio_irq,
+	.on_timeout		= NULL,
+};
+
+static struct tabla_hs_det_proc_state hs_det_proc_state_insert =
+{
+	.state_enter	= tabla_hs_det_proc_state_insert_enter,
+	.state_exit		= tabla_hs_det_proc_state_insert_exit,
+	.on_gpio_irq	= tabla_hs_det_proc_state_insert_on_gpio_irq,
+	.on_timeout		= NULL,
+};
+
+static struct tabla_hs_det_proc_state hs_btn_det_proc_state_init =
+{
+	.state_enter	= NULL,
+	.state_exit		= NULL,
+	.on_gpio_irq	= tabla_hs_btn_det_proc_state_init_on_gpio_irq,
+	.on_timeout		= tabla_hs_btn_det_proc_state_init_on_timeout,
+};
+
+static struct tabla_hs_det_proc_state hs_btn_det_proc_state_3pinouts =
+{
+	.state_enter	= tabla_hs_btn_det_proc_state_3pinouts_enter,
+	.state_exit		= NULL,
+	.on_gpio_irq	= tabla_hs_btn_det_proc_state_3pinouts_on_gpio_irq,
+	.on_timeout		= tabla_hs_btn_det_proc_state_3pinouts_on_timeout,
+};
+
+static struct tabla_hs_det_proc_state hs_btn_det_proc_state_4pinouts =
+{
+	.state_enter	= tabla_hs_btn_det_proc_state_4pinouts_enter,
+	.state_exit		= NULL,
+	.on_gpio_irq	= tabla_hs_btn_det_proc_state_4pinouts_on_gpio_irq,
+	.on_timeout		= tabla_hs_btn_det_proc_state_4pinouts_on_timeout,
+};
+
+int tabla_kc_hs_detect(struct snd_soc_codec *codec,
+		    const struct tabla_mbhc_config *cfg)
+{
+	struct tabla_priv *tabla;
+	int rc = 0;
+
+	if (!codec || !cfg->calibration) {
+		pr_err("Error: no codec or calibration\n");
+		return -EINVAL;
+	}
+
+	if (cfg->mclk_rate != TABLA_MCLK_RATE_12288KHZ) {
+		if (cfg->mclk_rate == TABLA_MCLK_RATE_9600KHZ)
+			pr_err("Error: clock rate %dHz is not yet supported\n",
+			       cfg->mclk_rate);
+		else
+			pr_err("Error: unsupported clock rate %d\n",
+			       cfg->mclk_rate);
+		return -EINVAL;
+	}
+
+	tabla = snd_soc_codec_get_drvdata(codec);
+	tabla->mbhc_cfg = *cfg;
+	tabla->in_gpio_handler = false;
+	tabla->current_plug = PLUG_TYPE_NONE;
+	tabla->lpi_enabled = false;
+	tabla_get_mbhc_micbias_regs(codec, &tabla->mbhc_bias_regs);
+
+	tabla->hs_det_proc_state = NULL;
+
+	rc = request_threaded_irq(tabla->mbhc_cfg.gpio_irq, NULL,
+							  tabla_jack_detect_on_gpio_irq,
+					   		  (IRQF_TRIGGER_RISING |
+					    	   IRQF_TRIGGER_FALLING),
+					   		  "tabla-gpio", codec);
+
+	if (!IS_ERR_VALUE(rc)) {
+		rc = enable_irq_wake(tabla->mbhc_cfg.gpio_irq);
+		if (rc < 0) {
+			pr_err("enable_irq_wake %d failed: %d\n", tabla->mbhc_cfg.gpio_irq, rc);
+		}
+		tabla_set_hs_det_proc_state(codec, &hs_det_proc_state_init);
+	} else {
+		pr_err("request_threaded_irq %d failed: %d\n", tabla->mbhc_cfg.gpio_irq, rc);
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL_GPL(tabla_kc_hs_detect);
+
+static struct tabla_hs_det_proc_state* tabla_set_hs_det_proc_state( 
+				struct snd_soc_codec *codec, struct tabla_hs_det_proc_state *state)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+	struct tabla_hs_det_proc_state *last = tabla->hs_det_proc_state;
+
+	tabla->hs_det_proc_state = state;
+	if(last != NULL && state != NULL)
+	{
+		state->next = last->next;
+	}
+
+	if(last != NULL && last->state_exit != NULL)
+	{
+		last->state_exit(codec);
+	}
+
+	if(state != NULL && state->state_enter != NULL)
+	{
+		state->state_enter(codec);
+	}
+	return last;
+}
+
+static void tabla_jack_detect_push_state(struct snd_soc_codec *codec,
+				struct tabla_hs_det_proc_state *state)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	if(state != NULL) {
+		state->next = tabla->hs_det_proc_state;
+		tabla->hs_det_proc_state = state;
+
+		if(state->state_enter != NULL)
+			state->state_enter(codec);
+	}
+}
+
+static struct tabla_hs_det_proc_state* tabla_jack_detect_pop_state(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+	struct tabla_hs_det_proc_state *head = tabla->hs_det_proc_state;
+
+	if(head != NULL)
+	{
+		tabla->hs_det_proc_state = head->next;
+
+		if(head->state_exit != NULL)
+			head->state_exit(codec);
+	}
+	return head;
+}
+
+static irqreturn_t tabla_jack_detect_on_gpio_irq(int irq, void *data)
+{
+	struct snd_soc_codec *codec = data;
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	struct tabla_hs_det_proc_state *state;
+	struct tabla_hs_det_proc_state *next;
+
+    if (tabla->mbhc_cfg.gpio_irq != irq)
+    {
+        return IRQ_NONE;
+    }
+
+	TABLA_ACQUIRE_LOCK(tabla->codec_resource_lock);
+
+	for(state = tabla->hs_det_proc_state; state != NULL; state = next) {
+		next = state->next;
+		if(state->on_gpio_irq != NULL)
+			state->on_gpio_irq(codec);
+	}
+
+	TABLA_RELEASE_LOCK(tabla->codec_resource_lock);
+
+    return IRQ_HANDLED;
+}
+
+static void tabla_jack_detect_on_timer(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+	struct tabla_hs_det_proc_state *state;
+	struct tabla_hs_det_proc_state *next;
+
+	TABLA_ACQUIRE_LOCK(tabla->codec_resource_lock);
+
+	for(state = tabla->hs_det_proc_state; state != NULL; state = next) {
+		next = state->next;
+		if(state->on_timeout != NULL)
+			state->on_timeout(codec);
+	}
+
+	TABLA_RELEASE_LOCK(tabla->codec_resource_lock);
+
+}
+
+static void tabla_hs_det_proc_state_init_enter(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+    tabla->hs_det_gpio_read_cnt	= 0;
+    tabla->hs_sw_gpio_read_cnt	= 0;
+    tabla->hs_btn_press_flg		= false;
+    tabla->hs_det_state			= HS_DET_STATE_REMOVE;
+
+	hrtimer_init(&tabla->hs_det_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	tabla->hs_det_timer.function = tabla_hs_det_timer_cb;
+	hrtimer_init(&tabla->hs_plug_type_rejudge_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	tabla->hs_plug_type_rejudge_timer.function = tabla_hs_plug_type_rejudge_timer_cb;
+
+	INIT_WORK(&tabla->hs_det_proc_work,tabla_hs_det_proc_work);
+
+	tabla_set_hs_det_proc_state(codec, &hs_det_proc_state_polling);
+}
+
+static void tabla_hs_det_proc_state_polling_enter(struct snd_soc_codec *codec)
+{
+	tabla_hs_det_set_timer(codec);
+}
+
+static void tabla_hs_det_proc_state_polling_on_timeout(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+    static enum tabla_hs_det_state	 last_state = HS_DET_STATE_REMOVE;
+    enum tabla_hs_det_state	 next_state;
+
+	if(!gpio_get_value(tabla->mbhc_cfg.gpio))
+	{
+		next_state = HS_DET_STATE_INSERT;
+	}
+	else
+	{
+		next_state = HS_DET_STATE_REMOVE;
+	}
+
+    if(last_state == next_state)
+    {
+		tabla->hs_det_gpio_read_cnt++;
+    }
+    else
+    {
+		last_state = next_state;
+		tabla->hs_det_gpio_read_cnt = 1;
+	}
+
+    if(tabla->hs_det_gpio_read_cnt == TABLA_HS_DET_READ_CNT)
+	{
+		if(next_state == HS_DET_STATE_INSERT)
+		{
+			tabla_set_hs_det_proc_state(codec, &hs_det_proc_state_insert);
+		}
+		else
+		{
+			tabla_set_hs_det_proc_state(codec, &hs_det_proc_state_remove);
+		}
+		
+		tabla->hs_det_gpio_read_cnt = 0;
+	}
+	else
+	{
+		tabla_hs_det_set_timer(codec);
+	}
+}
+
+static void tabla_hs_det_proc_state_remove_enter(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	if(tabla->hs_det_state == HS_DET_STATE_REMOVE)
+	{
+		return;
+	}
+
+	key_dm_driver_set_port(0x12);
+	key_dm_driver_set_port(0x10);
+
+	snd_soc_jack_report_no_dapm(tabla->mbhc_cfg.headset_jack, 0, TABLA_JACK_MASK);
+	snd_soc_jack_report_no_dapm(tabla->mbhc_cfg.button_jack, 0, SND_JACK_BTN_0);
+
+    tabla->hs_sw_gpio_read_cnt	= 0;
+    tabla->hs_btn_press_flg		= false;
+	tabla->hs_det_state 		= HS_DET_STATE_REMOVE;
+}
+
+static void tabla_hs_det_proc_state_remove_on_gpio_irq(struct snd_soc_codec *codec)
+{
+	tabla_set_hs_det_proc_state(codec, &hs_det_proc_state_polling);
+}
+
+static void tabla_hs_det_proc_state_insert_enter(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+	ktime_t debounce_time;
+
+	if (!tabla->mclk_enabled) {
+		tabla_codec_disable_clock_block(codec);
+		tabla_codec_enable_bandgap(codec, TABLA_BANDGAP_MBHC_MODE);
+		tabla_codec_enable_clock_block(codec, 1);
+	}
+
+	snd_soc_update_bits(codec, TABLA_A_LDO_H_MODE_1, 0x80, 0x80);
+	snd_soc_update_bits(codec, TABLA_A_MICB_2_CTL, 0x80, 0x80);
+	snd_soc_update_bits(codec, TABLA_A_MICB_CFILT_2_CTL, 0x80, 0x80);
+
+	tabla->mbhc_polling_active = true;
+	g_tabla_sw_prlling_flg = true;
+
+	tabla_jack_detect_push_state(codec, &hs_btn_det_proc_state_init);
+
+	tabla_hs_det_set_timer(codec);
+
+	debounce_time = ktime_set(3, 0);
+
+	hrtimer_start(&tabla->hs_plug_type_rejudge_timer, debounce_time, HRTIMER_MODE_REL);
+}
+
+static void tabla_hs_det_proc_state_insert_exit(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	hrtimer_cancel(&tabla->hs_det_timer);
+	hrtimer_cancel(&tabla->hs_plug_type_rejudge_timer);
+
+	tabla_hs_polling_off(codec);
+}
+
+static void tabla_hs_det_proc_state_insert_on_gpio_irq(struct snd_soc_codec *codec)
+{
+	tabla_set_hs_det_proc_state(codec, &hs_det_proc_state_polling);
+}
+
+static void tabla_hs_btn_det_proc_state_init_on_gpio_irq(struct snd_soc_codec *codec)
+{
+	tabla_jack_detect_pop_state(codec);
+}
+
+static void tabla_hs_btn_det_proc_state_init_on_timeout(struct snd_soc_codec *codec)
+{
+    static int last_value = 0;
+    int next_value;
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	next_value = tabla_hs_sw_gpio_get_value(codec);
+
+	if(last_value == next_value)
+	{
+		tabla->hs_sw_gpio_read_cnt++;
+	}
+	else
+	{
+		last_value = next_value;
+		tabla->hs_sw_gpio_read_cnt = 1;
+	}
+
+	if(tabla->hs_sw_gpio_read_cnt == TABLA_HS_PLUG_TYPE_CNT)
+	{
+		if(next_value)
+		{
+			tabla_set_hs_det_proc_state(codec, &hs_btn_det_proc_state_3pinouts);
+		}
+		else
+		{
+			tabla_set_hs_det_proc_state(codec, &hs_btn_det_proc_state_4pinouts);
+		}
+		tabla->hs_sw_gpio_read_cnt = 0;
+	}
+	else
+	{
+		tabla_hs_det_set_timer(codec);
+	}
+}
+
+static void tabla_hs_btn_det_proc_state_3pinouts_enter(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	key_dm_driver_set_port(0xC0);
+
+	snd_soc_jack_report_no_dapm(tabla->mbhc_cfg.headset_jack, SND_JACK_HEADPHONE, TABLA_JACK_MASK);
+
+	tabla->hs_det_state = HS_DET_STATE_INSERT;
+}
+
+static void tabla_hs_btn_det_proc_state_3pinouts_on_gpio_irq(struct snd_soc_codec *codec)
+{
+	tabla_jack_detect_pop_state(codec);
+}
+
+static void tabla_hs_btn_det_proc_state_3pinouts_on_timeout(struct snd_soc_codec *codec)
+{
+    static int last_value = 0;
+    int next_value;
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	next_value = tabla_hs_sw_gpio_get_value(codec);
+
+	if(last_value == next_value)
+	{
+		tabla->hs_sw_gpio_read_cnt++;
+	}
+	else
+	{
+		last_value = next_value;
+		tabla->hs_sw_gpio_read_cnt = 1;
+	}
+
+	if(tabla->hs_sw_gpio_read_cnt == TABLA_HS_PLUG_TYPE_CNT)
+	{
+		if(!next_value)
+		{
+			tabla_set_hs_det_proc_state(codec, &hs_btn_det_proc_state_4pinouts);
+		}
+		else
+		{
+			tabla_hs_polling_off(codec);
+		}
+
+		tabla->hs_sw_gpio_read_cnt = 0;
+	}
+	else
+	{
+		tabla_hs_det_set_timer(codec);
+	}
+}
+
+static void tabla_hs_btn_det_proc_state_4pinouts_enter(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	hrtimer_cancel(&tabla->hs_plug_type_rejudge_timer);
+
+	key_dm_driver_set_port(0xC0);
+
+	snd_soc_jack_report_no_dapm(tabla->mbhc_cfg.headset_jack, SND_JACK_HEADSET, TABLA_JACK_MASK);
+
+	tabla->hs_det_state = HS_DET_STATE_INSERT;
+
+	tabla_hs_det_set_timer(codec);
+}
+
+static void tabla_hs_btn_det_proc_state_4pinouts_on_gpio_irq(struct snd_soc_codec *codec)
+{
+	tabla_jack_detect_pop_state(codec);
+}
+
+static void tabla_hs_btn_det_proc_state_4pinouts_on_timeout(struct snd_soc_codec *codec)
+{
+    static int last_value = 0;
+    int next_value;
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+
+	next_value = tabla_hs_sw_gpio_get_value(codec);
+
+	if(last_value == next_value)
+	{
+		tabla->hs_sw_gpio_read_cnt++;
+	}
+	else
+	{
+		last_value = next_value;
+		tabla->hs_sw_gpio_read_cnt = 1;
+	}
+
+	if(tabla->hs_sw_gpio_read_cnt == TABLA_HS_POLLING_CNT)
+	{
+		if(next_value)
+		{
+			if(tabla->hs_btn_press_flg == false)
+			{
+				key_dm_driver_set_port(0x11);
+
+				snd_soc_jack_report_no_dapm(tabla->mbhc_cfg.button_jack, SND_JACK_BTN_0, SND_JACK_BTN_0);
+				tabla->hs_btn_press_flg = true;
+			}
+		}
+		else
+		{
+			if(tabla->hs_btn_press_flg == true)
+			{
+				key_dm_driver_set_port(0x10);
+
+				snd_soc_jack_report_no_dapm(tabla->mbhc_cfg.button_jack, 0, SND_JACK_BTN_0);
+				tabla->hs_btn_press_flg = false;
+			}
+		}
+		tabla->hs_sw_gpio_read_cnt = 0;
+	}
+
+	tabla_hs_det_set_timer(codec);
+
+}
+
+static void tabla_hs_det_set_timer(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+	ktime_t debounce_time;
+
+	debounce_time = ktime_set(0, 50000000);
+
+	hrtimer_start(&tabla->hs_det_timer, debounce_time, HRTIMER_MODE_REL);
+}
+
+static enum hrtimer_restart tabla_hs_det_timer_cb(struct hrtimer *hrtimer)
+{
+	struct tabla_priv *tabla;
+
+	tabla = container_of(hrtimer, struct tabla_priv, hs_det_timer);
+
+    schedule_work(&tabla->hs_det_proc_work);
+
+	return HRTIMER_NORESTART;
+}
+
+static enum hrtimer_restart tabla_hs_plug_type_rejudge_timer_cb(struct hrtimer *hrtimer)
+{
+	struct tabla_priv *tabla;
+
+	tabla = container_of(hrtimer, struct tabla_priv, hs_plug_type_rejudge_timer);
+
+    schedule_work(&tabla->hs_det_proc_work);
+
+	return HRTIMER_NORESTART;
+}
+
+static void tabla_hs_det_proc_work(struct work_struct *work)
+{
+	struct tabla_priv *tabla;
+	struct snd_soc_codec *codec;
+
+	tabla = container_of(work, struct tabla_priv, hs_det_proc_work);
+	codec = tabla->codec;
+
+	tabla_jack_detect_on_timer(codec);
+}
+
+static int tabla_hs_sw_gpio_get_value(struct snd_soc_codec *codec)
+{
+	return gpio_get_value(TABLA_HS_SW_GPIO);
+}
+
+static void tabla_hs_polling_off(struct snd_soc_codec *codec)
+{
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+	bool tx_path_in_use;
+	unsigned int reg_value = 0;
+
+	tabla->mbhc_polling_active = false;
+	g_tabla_sw_prlling_flg = false;
+
+	if (!tabla->mclk_enabled) {
+		tabla_codec_disable_clock_block(codec);
+		tabla_codec_enable_bandgap(codec, TABLA_BANDGAP_OFF);
+	}
+	
+	snd_soc_update_bits(codec, TABLA_A_MICB_2_CTL, 0x80, 0x00);
+	snd_soc_update_bits(codec, TABLA_A_MICB_CFILT_2_CTL, 0x80, 0x00);
+	snd_soc_update_bits(codec, TABLA_A_BIAS_CONFIG_MODE_BG_CTL, 0x01, 0x00);
+	snd_soc_update_bits(codec, TABLA_A_CLK_BUFF_EN1, 0x08, 0x00);
+
+	reg_value |= snd_soc_read(codec, TABLA_A_MICB_1_CTL);
+	reg_value |= snd_soc_read(codec, TABLA_A_MICB_2_CTL);
+	reg_value |= snd_soc_read(codec, TABLA_A_MICB_3_CTL);
+	reg_value |= snd_soc_read(codec, tabla->reg_addr.micb_4_ctl);
+
+	tx_path_in_use = ((reg_value & 0x80) != 0);
+	if (! tx_path_in_use) {
+		snd_soc_update_bits(codec, TABLA_A_LDO_H_MODE_1, 0x80, 0x00);
+	}
+	
 }
 
 module_init(tabla_codec_init);

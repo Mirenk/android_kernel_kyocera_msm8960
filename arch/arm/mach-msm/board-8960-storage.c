@@ -10,6 +10,13 @@
  * GNU General Public License for more details.
  *
  */
+/*********************************************************************
+ * 
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ * 
+ *********************************************************************/
+
 
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -46,15 +53,12 @@ static struct msm_mmc_reg_data mmc_vdd_reg_data[MAX_SDCC_CONTROLLER] = {
 		.lpm_uA = 9000,
 		.hpm_uA = 200000, /* 200mA */
 	},
-	/* SDCC2 : SDIO slot connected */
+	/* SDCC2 : SDHUB slot connected */
 	[SDCC2] = {
 		.name = "sdc_vdd",
-		.high_vol_level = 1800000,
-		.low_vol_level = 1800000,
-		.always_on = 1,
-		.lpm_sup = 1,
-		.lpm_uA = 9000,
-		.hpm_uA = 200000, /* 200mA */
+		.high_vol_level = 2950000,
+		.low_vol_level = 2950000,
+		.hpm_uA = 600000, /* 600mA */
 	},
 	/* SDCC3 : External card slot connected */
 	[SDCC3] = {
@@ -211,6 +215,12 @@ static struct msm_mmc_pad_drv_data mmc_pad_drv_data[MAX_SDCC_CONTROLLER] = {
 };
 
 struct msm_mmc_gpio sdc2_gpio[] = {
+#ifdef CONFIG_MMC_MSM_SDC2_8_BIT_SUPPORT
+	{96, "sdc2_dat_7"},
+	{95, "sdc2_dat_6"},
+	{94, "sdc2_dat_5"},
+	{93, "sdc2_dat_4"},
+#endif /* CONFIG_MMC_MSM_SDC2_8_BIT_SUPPORT */
 	{92, "sdc2_dat_3"},
 	{91, "sdc2_dat_2"},
 	{90, "sdc2_dat_1"},
@@ -305,13 +315,21 @@ static unsigned int sdc2_sup_clk_rates[] = {
 };
 
 static struct mmc_platform_data msm8960_sdc2_data = {
-	.ocr_mask       = MMC_VDD_165_195,
+	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
+#ifdef CONFIG_MMC_MSM_SDC2_8_BIT_SUPPORT
+	.mmc_bus_width  = MMC_CAP_8_BIT_DATA,
+#else
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+#endif
 	.sup_clk_table  = sdc2_sup_clk_rates,
 	.sup_clk_cnt    = ARRAY_SIZE(sdc2_sup_clk_rates),
+	.nonremovable	= 1,
 	.vreg_data      = &mmc_slot_vreg_data[SDCC2],
 	.pin_data       = &mmc_slot_pin_data[SDCC2],
-	.sdiowakeup_irq = MSM_GPIO_TO_INT(90),
+	.xpc_cap	= 1,
+	.uhs_caps	= (MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
+			MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_DDR50 |
+			MMC_CAP_UHS_SDR104 | MMC_CAP_MAX_CURRENT_600),
 	.msm_bus_voting_data = &sps_to_ddr_bus_voting_data,
 };
 #endif

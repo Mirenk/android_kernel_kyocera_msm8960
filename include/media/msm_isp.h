@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
+
 #ifndef __MSM_ISP_H__
 #define __MSM_ISP_H__
 
@@ -62,6 +67,9 @@
 #define MSG_ID_STOP_LS_ACK              43
 #define MSG_ID_OUTPUT_TERTIARY1         44
 #define MSG_ID_OUTPUT_TERTIARY2         45
+#define MSG_ID_ERROR_TIMEOUT            46
+#define MSG_ID_ERROR_I2C                47
+#define MSG_ID_ERROR_TEMPERATURE        48
 
 
 /* ISP command IDs */

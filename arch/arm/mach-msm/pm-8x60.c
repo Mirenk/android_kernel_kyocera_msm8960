@@ -10,6 +10,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+*/
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -72,6 +76,13 @@ module_param_named(
 	debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
 );
 
+#define DIAG_PWROFF_MODE_CMD_ONLY         0x01
+#define DIAG_PWROFF_MODE_CMD_WITH_ENDSEQ  0x02
+#define DIAG_PWROFF_MODE_COMPLETE         0xFF
+static unsigned short pwroff_mode = 0;
+
+extern void extension_ram_log_01(char *client_data);
+extern void extension_ram_log_02(char *client_data);
 
 /******************************************************************************
  * Sleep Modes and Parameters
@@ -109,6 +120,47 @@ static char *msm_pm_sleep_mode_labels[MSM_PM_SLEEP_MODE_NR] = {
 	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE] =
 		"standalone_power_collapse",
 };
+
+bool msm_is_pwroff_mode(void){
+	if (pwroff_mode == DIAG_PWROFF_MODE_CMD_WITH_ENDSEQ){
+		return true;
+	}else{
+		return false;
+	}
+}
+
+void msm_set_pwroff_complete(void){
+	pwroff_mode = DIAG_PWROFF_MODE_COMPLETE;
+}
+
+static ssize_t msm_pwroff_mode_show(struct kobject *kobj,
+						struct kobj_attribute *attr, char *buf)
+{
+	printk(KERN_DEBUG "msm_pwroff_mode_show\n");
+	return sprintf(buf, "%hu\n", pwroff_mode);
+}
+
+static ssize_t msm_pwroff_mode_store(struct kobject *kobj,
+				struct kobj_attribute *attr, const char * buf, size_t n)
+{
+	unsigned short value = 0;
+
+	printk(KERN_DEBUG "msm_pwroff_mode_store\n");
+	if (sscanf(buf, "%hu", &value) != 1 ||
+		value > DIAG_PWROFF_MODE_CMD_WITH_ENDSEQ)
+	{
+		printk(KERN_ERR "Invalid value\n");
+		return -EINVAL;
+	}
+	printk(KERN_DEBUG "value=%d\n", value);
+	pwroff_mode = value;
+
+	return n;
+}
+
+static struct kobj_attribute pwroff_mode_attr =
+		__ATTR(pwroff_mode, 0644, msm_pwroff_mode_show, msm_pwroff_mode_store);
+
 
 static struct msm_pm_sleep_ops pm_sleep_ops;
 /*
@@ -310,6 +362,13 @@ static int __init msm_pm_mode_sysfs_add(void)
 	for_each_possible_cpu(cpu) {
 		ret = msm_pm_mode_sysfs_add_cpu(cpu, modes_kobj);
 		if (ret)
+			goto mode_sysfs_add_exit;
+	}
+
+	ret = sysfs_create_file(module_kobj, &pwroff_mode_attr.attr);
+	if( ret < 0 ) {
+		pr_err("%s: cannot add sysfs entry for power off mode\n",
+				__func__);
 			goto mode_sysfs_add_exit;
 	}
 
@@ -523,7 +582,19 @@ static bool __ref msm_pm_spm_power_collapse(
 	vfp_pm_suspend();
 #endif
 
+	if (cpu == 0) {
+		extension_ram_log_01("msm_pm_collapse() enter\n");
+	} else if (cpu == 1) {
+		extension_ram_log_02("msm_pm_collapse() enter\n");
+	}
+
 	collapsed = msm_pm_l2x0_power_collapse();
+
+	if (cpu == 0) {
+		extension_ram_log_01("msm_pm_collapse() exit\n");
+	} else if (cpu == 1) {
+		extension_ram_log_02("msm_pm_collapse() exit\n");
+	}
 
 	msm_pm_boot_config_after_pc(cpu);
 

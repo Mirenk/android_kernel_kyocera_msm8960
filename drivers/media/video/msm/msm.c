@@ -10,6 +10,10 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/workqueue.h>
 #include <linux/delay.h>
@@ -148,6 +152,57 @@ void msm_camera_free_mctl(uint32_t handle)
 		pr_err("%s: invalid free handle\n", __func__);
 }
 
+int32_t msm_camera_evt_notify(struct msm_cam_media_controller *pmctl, uint8_t msg_id)
+{
+	int32_t rc = 0;
+	struct video_device *vdev;
+	struct v4l2_event ev;
+	struct msm_isp_event_ctrl *isp_event;
+
+	CDBG("%s: E msg_id = %d\n", __func__, msg_id);
+
+	if (!pmctl) {
+		pr_err("%s: no context \n", __func__);
+		rc = -1;
+		return rc;
+	}
+	isp_event = kzalloc(sizeof(struct msm_isp_event_ctrl), GFP_KERNEL);
+	if (!isp_event) {
+		pr_err("%s Insufficient memory. return", __func__);
+		rc = -1;
+		return rc;
+	}
+
+	if (pmctl->config_device == NULL) {
+		pr_err("%s: no config_device \n", __func__);
+		rc = -1;
+		kfree(isp_event);
+		return rc;
+	}
+	if (pmctl->config_device->config_stat_event_queue.pvdev == NULL) {
+		pr_err("%s: no vdev \n", __func__);
+		rc = -1;
+		kfree(isp_event);
+		return rc;
+	}
+
+	vdev = pmctl->config_device->config_stat_event_queue.pvdev;
+
+	ev.type = V4L2_EVENT_PRIVATE_START + MSM_CAM_RESP_STAT_EVT_MSG;
+	*((uint32_t *)ev.u.data) = (uint32_t)isp_event;
+	isp_event->resptype = MSM_CAM_RESP_STAT_EVT_MSG;
+	isp_event->isp_data.isp_msg.type = MSM_CAMERA_MSG;
+	isp_event->isp_data.isp_msg.len = 0;
+	isp_event->isp_data.isp_msg.msg_id = msg_id;
+	getnstimeofday(&(isp_event->isp_data.isp_msg.timestamp));
+
+	CDBG("%s: v4l2_event_queue call vdev = %p\n", __func__, vdev);
+	v4l2_event_queue(vdev, &ev);
+
+	CDBG("%s: X rc = %d\n", __func__, rc);
+	return rc;
+}
+
 /* callback function from all subdevices of a msm_cam_v4l2_device */
 static void msm_cam_v4l2_subdev_notify(struct v4l2_subdev *sd,
 				unsigned int notification, void *arg)
@@ -275,7 +330,7 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 	struct msm_ctrl_cmd *ctrlcmd;
 	struct msm_device_queue *queue =
 		&server_dev->server_queue[out->queue_idx].ctrl_q;
-	struct msm_cam_v4l2_device *pcam = server_dev->pcam_active;
+//	struct msm_cam_v4l2_device *pcam = server_dev->pcam_active;
 
 	struct v4l2_event v4l2_evt;
 	struct msm_isp_event_ctrl *isp_event;
@@ -348,7 +403,7 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 			if (++server_dev->server_evt_id == 0)
 				server_dev->server_evt_id++;
 			pr_err("%s: wait_event error %d\n", __func__, rc);
-			msm_cam_stop_hardware(pcam);
+//			msm_cam_stop_hardware(pcam);
 			return rc;
 		}
 	}
@@ -1907,10 +1962,12 @@ static int msm_open(struct file *f)
 	D("%s use_count %d\n", __func__, pcam->use_count);
 	if (pcam->use_count == 1) {
 		int ges_evt = MSM_V4L2_GES_CAM_OPEN;
-		struct msm_cam_server_queue *queue;
 		server_q_idx = msm_find_free_queue();
-		if (server_q_idx < 0)
+		if (server_q_idx < 0) {
+			mutex_unlock(&pcam->vid_lock);
+			pr_err("%s : no free queue : %d\n", __func__, __LINE__);
 			return server_q_idx;
+		}
 		pcam->server_queue_idx = server_q_idx;
 		queue = &g_server_dev.server_queue[server_q_idx];
 		queue->ctrl_data = kzalloc(sizeof(uint8_t) *
@@ -2995,6 +3052,10 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 			rc = g_server_dev.isp_subdev[0]->isp_notify(
 				g_server_dev.vfe_device[0], notification, arg);
 		}
+		if (notification == NOTIFY_VFE_MSG_OUT) {
+			s_ctrl = get_sctrl(g_server_dev.pcam_active->sensor_sdev);
+			rc = msm_sensor_vfe_msg_out(s_ctrl);
+		}
 		break;
 	case NOTIFY_VPE_MSG_EVT: {
 		struct msm_cam_media_controller *pmctl =
@@ -3017,6 +3078,24 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 	}
 		break;
 	case NOTIFY_AXI_IRQ:
+		{
+			struct msm_vfe_cfg_cmd cfg_cmd;
+			struct msm_camvfe_params vfe_params;
+			uint8_t flag = 0;
+
+			s_ctrl = get_sctrl(g_server_dev.pcam_active->sensor_sdev);
+			msm_sensor_get_frame_skip_flg(s_ctrl, &flag);
+
+			cfg_cmd.cmd_type = CMD_VFE_SET_FRAME_SKIP;
+			cfg_cmd.value = (void *)&flag;
+			vfe_params.vfe_cfg = &cfg_cmd;
+			rc = v4l2_subdev_call(g_server_dev.vfe_device[0],
+				core, ioctl, 0, &vfe_params);
+			if (rc < 0) {
+				pr_err("%s frame skip flag set rrror\n", __func__);
+				break;
+			}
+		}
 		rc = v4l2_subdev_call(g_server_dev.axi_device[0],
 			core, ioctl, VIDIOC_MSM_AXI_IRQ, arg);
 		break;
@@ -3381,6 +3460,7 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 	struct msm_camera_sensor_info *sdata;
 	struct msm_cam_v4l2_device *pcam;
 	struct msm_sensor_ctrl_t *s_ctrl;
+	struct msm_cam_media_controller *pmctl;
 
 	D("%s for %s\n", __func__, sensor_sd->name);
 
@@ -3416,6 +3496,13 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 	rc  = msm_cam_dev_init(pcam);
 	if (rc < 0)
 		goto failure;
+
+	pmctl = msm_camera_get_mctl(pcam->mctl_handle);
+	if (!pmctl) {
+		pr_err("%s NULL mctl pointer\n", __func__);
+		goto failure;
+	}
+	v4l2_set_subdev_hostdata(pcam->sensor_sdev, pmctl);
 
 	rc = msm_setup_mctl_node(pcam);
 	if (rc < 0) {
@@ -3480,6 +3567,7 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 			  __func__);
 			goto failure;
 		}
+		v4l2_set_subdev_hostdata(pcam->act_sdev, pmctl);
 	}
 
 	if (pcam->eeprom_sdev) {
@@ -3489,6 +3577,7 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 			D("%s eeprom sub device register failed\n", __func__);
 			goto failure;
 		}
+		v4l2_set_subdev_hostdata(pcam->eeprom_sdev, pmctl);
 	}
 
 	pcam->vnode_id = vnode_count++;

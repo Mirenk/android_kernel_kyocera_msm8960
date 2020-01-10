@@ -9,11 +9,17 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/module.h>
 #include "msm_actuator.h"
+#include "msm.h"
 
 static struct msm_actuator_ctrl_t msm_actuator_t;
+extern struct msm_calib_af imx111_af_data;
 
 static struct msm_actuator msm_vcm_actuator_table = {
 	.act_type = ACTUATOR_VCM,
@@ -24,6 +30,7 @@ static struct msm_actuator msm_vcm_actuator_table = {
 		.actuator_set_default_focus = msm_actuator_set_default_focus,
 		.actuator_init_focus = msm_actuator_init_focus,
 		.actuator_i2c_write = msm_actuator_i2c_write,
+		.actuator_af_mode = msm_actuator_af_mode,
 	},
 };
 
@@ -37,6 +44,7 @@ static struct msm_actuator msm_piezo_actuator_table = {
 			msm_actuator_piezo_set_default_focus,
 		.actuator_init_focus = msm_actuator_init_focus,
 		.actuator_i2c_write = msm_actuator_i2c_write,
+		.actuator_af_mode = msm_actuator_af_mode,
 	},
 };
 
@@ -58,6 +66,20 @@ int32_t msm_actuator_piezo_set_default_focus(
 			a_ctrl->initial_code, 0);
 		a_ctrl->curr_step_pos = 0;
 	}
+	return rc;
+}
+
+int32_t msm_actuator_evt_notify(struct msm_actuator_ctrl_t *a_ctrl, uint8_t msg_id)
+{
+	int32_t rc = 0;
+	struct msm_cam_media_controller *pmctl =
+		(struct msm_cam_media_controller *)v4l2_get_subdev_hostdata(&a_ctrl->sdev);
+
+	CDBG("%s: E msg_id = %d\n", __func__, msg_id);
+
+	rc = msm_camera_evt_notify(pmctl, msg_id);
+
+	CDBG("%s: X rc = %d\n", __func__, rc);
 	return rc;
 }
 
@@ -92,6 +114,7 @@ int32_t msm_actuator_i2c_write(struct msm_actuator_ctrl_t *a_ctrl,
 					if (rc < 0) {
 						pr_err("%s: i2c write error:%d\n",
 							__func__, rc);
+						msm_actuator_evt_notify(a_ctrl, MSG_ID_ERROR_I2C);
 						return rc;
 					}
 
@@ -112,6 +135,8 @@ int32_t msm_actuator_i2c_write(struct msm_actuator_ctrl_t *a_ctrl,
 			i2c_byte1, i2c_byte2);
 		rc = msm_camera_i2c_write(&a_ctrl->i2c_client,
 			i2c_byte1, i2c_byte2, a_ctrl->i2c_data_type);
+		if (rc < 0)
+			msm_actuator_evt_notify(a_ctrl, MSG_ID_ERROR_I2C);
 	}
 		CDBG("%s: OUT\n", __func__);
 	return rc;
@@ -144,8 +169,10 @@ int32_t msm_actuator_init_focus(struct msm_actuator_ctrl_t *a_ctrl,
 				__func__, type);
 			break;
 		}
-		if (rc < 0)
+		if (rc < 0) {
+			msm_actuator_evt_notify(a_ctrl, MSG_ID_ERROR_I2C);
 			break;
+		}
 	}
 
 	a_ctrl->curr_step_pos = 0;
@@ -218,6 +245,33 @@ int32_t msm_actuator_piezo_move_focus(
 	return rc;
 }
 
+int32_t msm_actuator_af_mode(
+	struct msm_actuator_ctrl_t *a_ctrl,
+	uint8_t mode)
+{
+    int32_t  rc=0;
+    uint8_t  byte1,byte2;
+    uint16_t dac;
+
+    CDBG("%s  mode:%d\n", __func__, mode);
+
+    if( (mode == 1) || (mode == 4)){
+        if(mode == 1){//macro
+            dac = imx111_af_data.macro_dac;
+        }
+        else{//infinity
+            dac = imx111_af_data.inf_dac;
+        }
+
+        byte1 = (uint8_t)(dac >> 4) & 0xFF;
+        byte2 = (uint8_t)(((dac << 4) & 0xF0) | 0x07);
+        CDBG("%02x %02x\n", byte1, byte2);
+    	rc = msm_camera_i2c_write(&a_ctrl->i2c_client,
+	    	byte1, byte2, MSM_CAMERA_I2C_BYTE_DATA);
+    }
+	return rc;
+}
+
 int32_t msm_actuator_move_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_move_params_t *move_params)
@@ -254,8 +308,6 @@ int32_t msm_actuator_move_focus(
 			target_step_pos = dest_step_pos;
 			target_lens_pos =
 				a_ctrl->step_position_table[target_step_pos];
-			if (curr_lens_pos == target_lens_pos)
-				return rc;
 			rc = a_ctrl->func_tbl->
 				actuator_write_focus(
 					a_ctrl,
@@ -276,8 +328,6 @@ int32_t msm_actuator_move_focus(
 			target_step_pos = step_boundary;
 			target_lens_pos =
 				a_ctrl->step_position_table[target_step_pos];
-			if (curr_lens_pos == target_lens_pos)
-				return rc;
 			rc = a_ctrl->func_tbl->
 				actuator_write_focus(
 					a_ctrl,
@@ -510,6 +560,13 @@ int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 			&cdata.cfg.move);
 		if (rc < 0)
 			pr_err("%s move focus failed %d\n", __func__, rc);
+		break;
+
+	case CFG_SET_AF_MODE:
+		rc = a_ctrl->func_tbl->actuator_af_mode(a_ctrl,
+			cdata.cfg.mode);
+		if (rc < 0)
+			pr_err("%s afmode failed %d\n", __func__, rc);
 		break;
 
 	default:

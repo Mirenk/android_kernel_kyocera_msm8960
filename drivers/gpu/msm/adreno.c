@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
+
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
@@ -1860,6 +1865,12 @@ static long adreno_ioctl(struct kgsl_device_private *dev_priv,
 
 	switch (cmd) {
 	case IOCTL_KGSL_DRAWCTXT_SET_BIN_BASE_OFFSET:
+		if (data == NULL) {
+			KGSL_DRV_INFO(dev_priv->device,
+					"ioctl data is null : %08x\n", cmd);
+			result = -EFAULT;
+			break;
+		}
 		binbase = data;
 
 		context = kgsl_find_context(dev_priv, binbase->drawctxt_id);

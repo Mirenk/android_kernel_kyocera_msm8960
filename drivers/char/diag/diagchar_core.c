@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2011 KYOCERA Corporation
+ * (C) 2012 KYOCERA Corporation
+ */
 
 #include <linux/slab.h>
 #include <linux/init.h>
@@ -38,6 +43,9 @@
 #endif
 #include <linux/timer.h>
 
+#include <mach/scm.h>
+#include <mach/restart.h>
+
 MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");
@@ -60,7 +68,7 @@ static unsigned int itemsize_write_struct = 20; /*Size of item in the mempool */
 static unsigned int poolsize_write_struct = 8; /* Num of items in the mempool */
 /* This is the max number of user-space clients supported at initialization*/
 static unsigned int max_clients = 15;
-static unsigned int threshold_client_limit = 30;
+static unsigned int threshold_client_limit = 50;
 /* This is the maximum number of pkt registrations supported at initialization*/
 unsigned int diag_max_reg = 600;
 unsigned int diag_threshold_reg = 750;
@@ -76,6 +84,8 @@ module_param(max_clients, uint, 0);
 /* delayed_rsp_id 0 represents no delay in the response. Any other number
     means that the diag packet has a delayed response. */
 static uint16_t delayed_rsp_id = 1;
+int diagchar_kioctl_flg = 0x00;
+
 #define DIAGPKT_MAX_DELAYED_RSP 0xFFFF
 /* This macro gets the next delayed respose id. Once it reaches
  DIAGPKT_MAX_DELAYED_RSP, it stays at DIAGPKT_MAX_DELAYED_RSP */
@@ -229,7 +239,9 @@ static int diagchar_close(struct inode *inode, struct file *file)
 	* This will specially help in case of ungraceful exit of any DCI client
 	* This call will remove any pending registrations of such client
 	*/
+	diagchar_kioctl_flg = 0x01;
 	diagchar_ioctl(NULL, DIAG_IOCTL_DCI_DEINIT, 0);
+	diagchar_kioctl_flg = 0x00;
 #ifdef CONFIG_DIAG_OVER_USB
 	/* If the SD logging process exits, change logging to USB mode */
 	if (driver->logging_process_id == current->tgid) {
@@ -359,6 +371,15 @@ long diagchar_ioctl(struct file *filp,
 	if (iocmd == DIAG_IOCTL_COMMAND_REG) {
 		struct bindpkt_params_per_process *pkt_params =
 			 (struct bindpkt_params_per_process *) ioarg;
+		struct bindpkt_params_per_process check_buf;
+		
+		if (diagchar_kioctl_flg!=0x01){
+			if ( copy_from_user(&check_buf , (struct bindpkt_params_per_process *)ioarg, sizeof(check_buf)) ) {
+				return success;
+			}
+			pkt_params = &check_buf;
+		}
+		
 		mutex_lock(&driver->diagchar_mutex);
 		for (i = 0; i < diag_max_reg; i++) {
 			if (driver->table[i].process_id == 0) {
@@ -413,10 +434,19 @@ long diagchar_ioctl(struct file *filp,
 	} else if (iocmd == DIAG_IOCTL_GET_DELAYED_RSP_ID) {
 		struct diagpkt_delay_params *delay_params =
 					(struct diagpkt_delay_params *) ioarg;
-
+		struct diagpkt_delay_params check_buf;
+	    
+		if (diagchar_kioctl_flg!=0x01){
+			if ( copy_from_user(&check_buf , (struct diagpkt_delay_params *)ioarg, sizeof(check_buf)) ) {
+				return success;
+			}
+			delay_params = &check_buf;
+		}
+		
 		if ((delay_params->rsp_ptr) &&
 		 (delay_params->size == sizeof(delayed_rsp_id)) &&
 				 (delay_params->num_bytes_ptr)) {
+			delay_params = (struct diagpkt_delay_params *)ioarg;
 			*((uint16_t *)delay_params->rsp_ptr) =
 				DIAGPKT_NEXT_DELAYED_RSP_ID(delayed_rsp_id);
 			*(delay_params->num_bytes_ptr) = sizeof(delayed_rsp_id);
@@ -474,6 +504,13 @@ long diagchar_ioctl(struct file *filp,
 		pr_debug("diag: complete deleting registrations\n");
 		return success;
 	} else if (iocmd == DIAG_IOCTL_DCI_SUPPORT) {
+		uint16_t check_buf;
+		
+		if (diagchar_kioctl_flg!=0x01){
+			if ( copy_from_user(&check_buf , (uint16_t *)ioarg, sizeof(check_buf)) ) {
+				return success;
+			}
+		}
 		if (driver->ch_dci)
 			support_list = support_list | DIAG_CON_MPSS;
 		*(uint16_t *)ioarg = support_list;
@@ -628,6 +665,12 @@ long diagchar_ioctl(struct file *filp,
 		}
 #endif /* DIAG over USB */
 		success = 1;
+	} else if (iocmd == DIAG_IOCTL_OEM_KC_01) {
+		int mode = (int)ioarg;
+		success = scm_call_atomic1(254,2,mode);
+		if (!success) {
+			msm_set_restart_mode(RESTART_OEM);
+		}
 	}
 
 	return success;

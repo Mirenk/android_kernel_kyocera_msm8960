@@ -14,7 +14,10 @@
  * Qualcomm PMIC 8921/8018 ADC driver header file
  *
  */
-
+/*
+ * This software is contributed or developed by KYOCERA Corporation.
+ * (C) 2012 KYOCERA Corporation
+ */
 #ifndef __PM8XXX_ADC_H
 #define __PM8XXX_ADC_H
 
@@ -212,10 +215,12 @@ enum pm8xxx_adc_premux_mpp_scale_type {
  */
 enum pm8xxx_adc_scale_fn_type {
 	ADC_SCALE_DEFAULT = 0,
+	ADC_SCALE_DEFAULT_VBAT,
 	ADC_SCALE_BATT_THERM,
 	ADC_SCALE_PA_THERM,
 	ADC_SCALE_PMIC_THERM,
 	ADC_SCALE_XOTHERM,
+	ADC_SCALE_CAMERA_THERM,
 	ADC_SCALE_NONE,
 };
 
@@ -323,6 +328,21 @@ int32_t pm8xxx_adc_scale_default(int32_t adc_code,
 			const struct pm8xxx_adc_chan_properties *chan_prop,
 			struct pm8xxx_adc_chan_result *chan_rslt);
 /**
+ * pm8xxx_adc_scale_default_vbat() - Scales the pre-calibrated digital output
+ *		of an ADC to the ADC reference and compensates for the
+ *		gain and offset.
+ * @adc_code:	pre-calibrated digital ouput of the ADC.
+ * @adc_prop:	adc properties of the pm8xxx adc such as bit resolution,
+ *		reference voltage.
+ * @chan_prop:	individual channel properties to compensate the i/p scaling,
+ *		slope and offset.
+ * @chan_rslt:	Physical result to be stored.
+ */
+int32_t pm8xxx_adc_scale_default_vbat(int32_t adc_code,
+			const struct pm8xxx_adc_properties *adc_prop,
+			const struct pm8xxx_adc_chan_properties *chan_prop,
+			struct pm8xxx_adc_chan_result *chan_rslt);
+/**
  * pm8xxx_adc_scale_tdkntcg_therm() - Scales the pre-calibrated digital output
  *		of an ADC to the ADC reference and compensates for the
  *		gain and offset. Returns the temperature of the xo therm in mili
@@ -369,6 +389,21 @@ int32_t pm8xxx_adc_scale_pa_therm(int32_t adc_code,
 			const struct pm8xxx_adc_chan_properties *chan_prop,
 			struct pm8xxx_adc_chan_result *chan_rslt);
 /**
+ * pm8xxx_adc_scale_camera_therm() - Scales the pre-calibrated digital output
+ *		of an ADC to the ADC reference and compensates for the
+ *		gain and offset. Returns the temperature in degC.
+ * @adc_code:	pre-calibrated digital ouput of the ADC.
+ * @adc_prop:	adc properties of the pm8xxx adc such as bit resolution,
+ *		reference voltage.
+ * @chan_prop:	individual channel properties to compensate the i/p scaling,
+ *		slope and offset.
+ * @chan_rslt:	physical result to be stored.
+ */
+int32_t pm8xxx_adc_scale_camera_therm(int32_t adc_code,
+			const struct pm8xxx_adc_properties *adc_prop,
+			const struct pm8xxx_adc_chan_properties *chan_prop,
+			struct pm8xxx_adc_chan_result *chan_rslt);
+/**
  * pm8xxx_adc_scale_pmic_therm() - Scales the pre-calibrated digital output
  *		of an ADC to the ADC reference and compensates for the
  *		gain and offset. Performs the AMUX out as 2mv/K and returns
@@ -405,6 +440,11 @@ static inline int32_t pm8xxx_adc_scale_default(int32_t adc_code,
 			const struct pm8xxx_adc_chan_properties *chan_prop,
 			struct pm8xxx_adc_chan_result *chan_rslt)
 { return -ENXIO; }
+static inline int32_t pm8xxx_adc_scale_default_vbat(int32_t adc_code,
+			const struct pm8xxx_adc_properties *adc_prop,
+			const struct pm8xxx_adc_chan_properties *chan_prop,
+			struct pm8xxx_adc_chan_result *chan_rslt)
+{ return -ENXIO; }
 static inline int32_t pm8xxx_adc_tdkntcg_therm(int32_t adc_code,
 			const struct pm8xxx_adc_properties *adc_prop,
 			const struct pm8xxx_adc_chan_properties *chan_prop,
@@ -421,6 +461,11 @@ static inline int32_t pm8xxx_adc_scale_pa_therm(int32_t adc_code,
 			struct pm8xxx_adc_chan_result *chan_rslt)
 { return -ENXIO; }
 static inline int32_t pm8xxx_adc_scale_pmic_therm(int32_t adc_code,
+			const struct pm8xxx_adc_properties *adc_prop,
+			const struct pm8xxx_adc_chan_properties *chan_prop,
+			struct pm8xxx_adc_chan_result *chan_rslt)
+{ return -ENXIO; }
+static inline int32_t pm8xxx_adc_scale_camera_therm(int32_t adc_code,
 			const struct pm8xxx_adc_properties *adc_prop,
 			const struct pm8xxx_adc_chan_properties *chan_prop,
 			struct pm8xxx_adc_chan_result *chan_rslt)
