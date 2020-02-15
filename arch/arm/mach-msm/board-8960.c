@@ -128,6 +128,10 @@
 #include <linux/persistent_ram.h>
 #endif
 
+#ifdef CONFIG_KEXEC_HARDBOOT
+#include <linux/memblock.h>
+#endif
+
 static struct platform_device msm_fm_platform_init = {
 	.name = "iris_fm",
 	.id   = -1,
@@ -849,6 +853,18 @@ early_param("ext_display", ext_display_setup);
 
 static void __init msm8960_reserve(void)
 {
+#ifdef CONFIG_KEXEC_HARDBOOT
+	phys_addr_t start;
+	int ret;
+
+	// Reserve space for hardboot page, just before the ram_console
+	start = KEXEC_HB_PAGE_ADDR;
+	ret = memblock_remove(start, SZ_1M);
+	if(!ret)
+		pr_info("Hardboot page reserved at 0x%X\n", start);
+	else
+		pr_err("Failed to reserve space for hardboot page at 0x%X!\n", start);
+#endif
 	msm8960_set_display_params(prim_panel_name, ext_panel_name);
 	msm_reserve();
 	if (msm8960_fmem_pdata.size) {
